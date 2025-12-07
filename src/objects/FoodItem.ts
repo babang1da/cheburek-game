@@ -22,8 +22,12 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
         this.gridCol = col;
         this.foodType = foodType;
 
-        // Scale to fit cell
-        this.setDisplaySize(CELL_SIZE - 2, CELL_SIZE - 2);
+        // Scale to fit cell while preserving aspect ratio
+        const maxSize = CELL_SIZE - 10; // Leave small padding
+        const scaleX = maxSize / this.width;
+        const scaleY = maxSize / this.height;
+        const scale = Math.min(scaleX, scaleY); // Use smaller scale to fit
+        this.setScale(scale);
 
         // Make interactive
         this.setInteractive();
@@ -84,13 +88,12 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
     }
 
     animateSelect(selected: boolean): void {
-        const baseSize = CELL_SIZE - 2;
-        const targetSize = selected ? baseSize * 1.1 : baseSize;
+        const targetScale = selected ? this.scaleX * 1.1 : this.scaleX / 1.1;
 
         this.scene.tweens.add({
             targets: this,
-            displayWidth: targetSize,
-            displayHeight: targetSize,
+            scaleX: targetScale,
+            scaleY: targetScale,
             duration: 100,
             ease: 'Power2'
         });
