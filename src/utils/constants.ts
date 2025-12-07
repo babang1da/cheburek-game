@@ -2,10 +2,10 @@
 export const GRID_COLS = 6;
 export const GRID_ROWS = 6;
 export const CELL_SIZE = 110;
-export const GRID_OFFSET_X = 60;  // Centered for 720px width
+export const GRID_OFFSET_X = 30;  // (720 - (6 * 110)) / 2 = 30px margin
 export const GRID_OFFSET_Y = 280;
 
-export const FOOD_TYPES = ['manti', 'belyash', 'cheburek', 'samsa', 'pakhlava'];
+export const FOOD_TYPES = ['manti', 'belyash', 'cheburek', 'samsa', 'pakhlava', 'borsok'];
 export const FOOD_COUNT = FOOD_TYPES.length;
 
 export const MIN_MATCH = 3;
