@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Create Food Sprites</title>
+</head>
+<body>
+    <canvas id="canvas" width="200" height="200"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const foods = [
+            { name: 'manti', emoji: '🥟', color: '#FFE4B5' },
+            { name: 'belyash', emoji: '🥙', color: '#DEB887' },
+            { name: 'khinkali', emoji: '🥟', color: '#F0E68C' },
+            { name: 'cheburek', emoji: '��', color: '#FFD700' },
+            { name: 'samsa', emoji: '🥮', color: '#F4A460' },
+            { name: 'dolma', emoji: '🍃', color: '#90EE90' }
+        ];
+        
+        foods.forEach(food => {
+            ctx.clearRect(0, 0, 200, 200);
+            
+            // Draw circle
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(100, 100, 90, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw emoji
+            ctx.font = '80px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(food.emoji, 100, 100);
+            
+            // Download
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = food.name + '.png';
+                a.click();
+            });
+        });
+    </script>
+</body>
+</html>
