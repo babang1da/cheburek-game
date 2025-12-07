@@ -26,7 +26,6 @@ export class GameScene extends Phaser.Scene {
 
     private scoreText!: Phaser.GameObjects.Text;
     private movesText!: Phaser.GameObjects.Text;
-    private targetText!: Phaser.GameObjects.Text;
     private comboText!: Phaser.GameObjects.Text;
     private gameOverPanel!: Phaser.GameObjects.Container;
 
@@ -64,7 +63,7 @@ export class GameScene extends Phaser.Scene {
 
     private createUI() {
         // Title
-        const title = this.add.text(360, 50, 'SAMSA SWAP', {
+        this.add.text(360, 50, 'SAMSA SWAP', {
             fontSize: '48px',
             fontFamily: 'Arial',
             color: '#ff6b35',
@@ -86,7 +85,7 @@ export class GameScene extends Phaser.Scene {
         });
 
         // Target
-        this.targetText = this.add.text(400, 100, `Цель: ${TARGET_SCORE}`, {
+        this.add.text(400, 100, `Цель: ${TARGET_SCORE}`, {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffcc00'
@@ -304,36 +303,6 @@ export class GameScene extends Phaser.Scene {
         return false;
     }
 
-    private onItemClicked(item: FoodItem) {
-        console.log('Click:', { isProcessing: this.isProcessing, isMoving: item.isMoving, selected: !!this.selectedItem });
-
-        if (this.isProcessing || item.isMoving) {
-            console.log('Blocked: processing or moving');
-            return;
-        }
-
-        if (!this.selectedItem) {
-            console.log('First selection');
-            this.selectedItem = item;
-            item.animateSelect(true);
-        } else if (this.selectedItem === item) {
-            console.log('Deselect');
-            this.selectedItem.animateSelect(false);
-            this.selectedItem = null;
-        } else {
-            if (this.areAdjacent(this.selectedItem, item)) {
-                console.log('Adjacent - trying swap');
-                this.selectedItem.animateSelect(false);
-                this.trySwap(this.selectedItem, item);
-                this.selectedItem = null;
-            } else {
-                console.log('Not adjacent - selecting new');
-                this.selectedItem.animateSelect(false);
-                this.selectedItem = item;
-                item.animateSelect(true);
-            }
-        }
-    }
     private areAdjacent(item1: FoodItem, item2: FoodItem): boolean {
         const rowDiff = Math.abs(item1.gridRow - item2.gridRow);
         const colDiff = Math.abs(item1.gridCol - item2.gridCol);
