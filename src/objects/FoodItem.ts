@@ -29,10 +29,60 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
         const scale = Math.min(scaleX, scaleY); // Use smaller scale to fit
         this.setScale(scale);
 
+        // Ensure item is above grid
+        this.setDepth(1);
+
+        // Add shadow effect (Phaser 3.60+)
+        if (this.postFX) {
+            // x=6, y=6 (offset to bottom-right), decay=0.1, intensity=0.1 (extremely subtle)
+            this.postFX.addShadow(-2, 2, 0.1, 1, 0x000000, 10, 0.1);
+        }
+
         // Make interactive
         this.setInteractive();
 
+        // Start random idle animation
+        this.startIdleAnimation();
+
         scene.add.existing(this);
+    }
+
+    private startIdleAnimation() {
+        // Random start delay between 2 and 10 seconds
+        this.scene.time.addEvent({
+            delay: Phaser.Math.Between(2000, 10000),
+            callback: () => {
+                if (!this.scene) return; // Check if still alive
+
+                // Only jump animation
+                this.animateJump();
+
+                // Schedule next animation
+                this.startIdleAnimation();
+            }
+        });
+    }
+
+    private animateJump() {
+        if (this.isMoving || !this.scene) return;
+
+        const startY = this.y;
+        const startScaleX = this.scaleX;
+        const startScaleY = this.scaleY;
+
+        this.scene.tweens.add({
+            targets: this,
+            y: startY - 10,
+            scaleY: startScaleY * 1.05,
+            scaleX: startScaleX * 0.95,
+            duration: 150,
+            yoyo: true,
+            ease: 'Quad.Out',
+            onComplete: () => {
+                this.y = startY; // Ensure return to exact position
+                this.setScale(startScaleX, startScaleY); // Restore exact original scale
+            }
+        });
     }
 
     animateSwap(targetX: number, targetY: number): Promise<void> {
@@ -89,6 +139,9 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
 
     animateSelect(selected: boolean): void {
         const targetScale = selected ? this.scaleX * 1.1 : this.scaleX / 1.1;
+
+        // Bring to top when selected
+        this.setDepth(selected ? 2 : 1);
 
         this.scene.tweens.add({
             targets: this,

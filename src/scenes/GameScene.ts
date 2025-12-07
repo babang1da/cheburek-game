@@ -42,10 +42,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     create() {
-        // Background
+        // Background (semi-transparent overlay to darken grid area slightly if needed, or remove completely)
         const bg = this.add.image(360, 540, 'background');
         bg.setDisplaySize(720, 1080);
-        bg.setAlpha(0.3);
+        bg.setAlpha(0); // Make completely transparent or remove this block entirely since we use CSS background
 
         // Load best score
         this.bestScore = parseInt(localStorage.getItem('samsa_swap_best_score') || '0', 10);
@@ -55,6 +55,26 @@ export class GameScene extends Phaser.Scene {
 
         // Initialize grid
         this.initGrid();
+
+        // Draw grid background cells
+        const graphics = this.add.graphics();
+        graphics.fillStyle(0x000000, 0.3); // Semi-transparent black
+
+        // Calculate responsive grid params (re-using logic or just using current constants since we are in FIT mode)
+        // Since we are using FIT mode with 720x1080 design resolution:
+        for (let row = 0; row < GRID_ROWS; row++) {
+            for (let col = 0; col < GRID_COLS; col++) {
+                const x = GRID_OFFSET_X + col * CELL_SIZE;
+                const y = GRID_OFFSET_Y + row * CELL_SIZE;
+
+                // Draw rounded rect for each cell
+                // x, y is center, so we need top-left for fillRoundedRect
+                const size = CELL_SIZE - 8; // Slightly smaller than cell
+                graphics.fillRoundedRect(x - size / 2, y - size / 2, size, size, 12);
+            }
+        }
+        graphics.setDepth(0);
+
         this.fillBoard();
 
         // Update UI

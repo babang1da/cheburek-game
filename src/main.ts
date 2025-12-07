@@ -7,13 +7,11 @@ const config: Phaser.Types.Core.GameConfig = {
   width: 720,
   height: 1080,
   parent: 'app',
-  backgroundColor: '#2d2d2d',
+  backgroundColor: 'rgba(0,0,0,0)', // Transparent so CSS background shows
+  transparent: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    parent: 'app',
-    width: 720,
-    height: 1080,
   },
   scene: [GameScene],
 };

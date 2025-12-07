@@ -7,18 +7,22 @@
 body {
   margin: 0;
   padding: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* Use the game background for the whole page */
+  background-image: url('/assets/background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
-  min-height: 100dvh;
-  /* Dynamic viewport height for mobile */
-  font-family: Arial, sans-serif;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  font-family: 'Arial', sans-serif;
   overflow: hidden;
-  /* Prevent scrolling */
   touch-action: none;
-  /* Prevent pull-to-refresh */
 }
 
 #app {
@@ -31,8 +35,5 @@ body {
 
 canvas {
   display: block;
-  max-width: 100%;
-  max-height: 100vh;
-  max-height: 100dvh;
   touch-action: none;
 }

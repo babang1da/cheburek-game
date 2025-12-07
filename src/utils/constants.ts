@@ -5,7 +5,7 @@ export const CELL_SIZE = 110;
 export const GRID_OFFSET_X = 60;  // Centered for 720px width
 export const GRID_OFFSET_Y = 280;
 
-export const FOOD_TYPES = ['manti', 'belyash', 'khinkali', 'cheburek', 'samsa', 'dolma'];
+export const FOOD_TYPES = ['manti', 'belyash', 'cheburek', 'samsa', 'pakhlava'];
 export const FOOD_COUNT = FOOD_TYPES.length;
 
 export const MIN_MATCH = 3;
