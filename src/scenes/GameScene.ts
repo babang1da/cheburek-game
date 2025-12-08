@@ -42,10 +42,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     create() {
-        // Background (semi-transparent overlay to darken grid area slightly if needed, or remove completely)
-        const bg = this.add.image(360, 540, 'background');
-        bg.setDisplaySize(720, 1080);
-        bg.setAlpha(0); // Make completely transparent or remove this block entirely since we use CSS background
+        // Generate textures for items that might be missing assets
+        this.generateTextures();
+
+        // Background (transparent, handled by CSS)
+        // const bg = this.add.image(360, 540, 'background');
+        // bg.setDisplaySize(720, 1080);
+        // bg.setAlpha(0); 
 
         // Load best score
         this.bestScore = parseInt(localStorage.getItem('samsa_swap_best_score') || '0', 10);
@@ -64,6 +67,7 @@ export class GameScene extends Phaser.Scene {
         // Since we are using FIT mode with 720x1080 design resolution:
         for (let row = 0; row < GRID_ROWS; row++) {
             for (let col = 0; col < GRID_COLS; col++) {
+                // Add half cell size to align with items
                 const x = GRID_OFFSET_X + col * CELL_SIZE;
                 const y = GRID_OFFSET_Y + row * CELL_SIZE;
 
@@ -132,8 +136,9 @@ export class GameScene extends Phaser.Scene {
 
     private createGameOverPanel() {
         this.gameOverPanel = this.add.container(360, 540);
+        this.gameOverPanel.setDepth(100); // Ensure it's above everything
 
-        const bg = this.add.rectangle(0, 0, 600, 400, 0x000000, 0.9);
+        const bg = this.add.rectangle(0, 0, 600, 400, 0x000000, 0.9).setStrokeStyle(4, 0xffcc00);
         const title = this.add.text(0, -100, 'ИГРА ОКОНЧЕНА', {
             fontSize: '42px',
             fontFamily: 'Arial',
@@ -192,23 +197,13 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
-    private createFoodItem(row: number, col: number, animate: boolean = false): FoodItem {
+    private createFoodItem(row: number, col: number): FoodItem {
         const foodType = this.getRandomFoodType(row, col);
+        // Add half cell size to center the item in the cell
         const x = GRID_OFFSET_X + col * CELL_SIZE;
         const y = GRID_OFFSET_Y + row * CELL_SIZE;
 
         const item = new FoodItem(this, row, col, foodType, x, y);
-
-        if (animate) {
-            item.y = GRID_OFFSET_Y - CELL_SIZE * 2;
-            item.setAlpha(0);
-            this.tweens.add({
-                targets: item,
-                alpha: 1,
-                duration: 200
-            });
-            item.animateDrop(y, row + 2);
-        }
 
         this.grid[row][col] = item;
 
@@ -452,15 +447,31 @@ export class GameScene extends Phaser.Scene {
     }
 
     private async fillEmptySpaces() {
+        const promises: Promise<void>[] = [];
+
         for (let col = 0; col < GRID_COLS; col++) {
             for (let row = GRID_ROWS - 1; row >= 0; row--) {
                 if (this.grid[row][col] === null) {
-                    this.createFoodItem(row, col, true);
+                    const item = this.createFoodItem(row, col);
+
+                    // Animation setup
+                    const targetY = item.y;
+                    item.y = GRID_OFFSET_Y - CELL_SIZE * 2;
+                    item.setAlpha(0);
+
+                    this.tweens.add({
+                        targets: item,
+                        alpha: 1,
+                        duration: 200
+                    });
+
+                    // We use row + 2 as distance approximation for speed
+                    promises.push(item.animateDrop(targetY, row + 2));
                 }
             }
         }
 
-        await this.time.delayedCall(300, () => { });
+        await Promise.all(promises);
     }
 
     private updateUI() {
@@ -512,6 +523,72 @@ export class GameScene extends Phaser.Scene {
         if (this.score > this.bestScore) {
             this.bestScore = this.score;
             localStorage.setItem('samsa_swap_best_score', this.bestScore.toString());
+        }
+    }
+    private generateTextures() {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        // Helper to draw kawaii face
+        const drawFace = (ctx: Phaser.GameObjects.Graphics, x: number, y: number) => {
+            ctx.fillStyle(0x3e2723); // Dark brown eyes
+            ctx.fillCircle(x - 20, y - 10, 8);
+            ctx.fillCircle(x + 20, y - 10, 8);
+
+            // Smile
+            ctx.lineStyle(3, 0x3e2723);
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, 180, false);
+            ctx.strokePath();
+
+            // Blush
+            ctx.fillStyle(0xff69b4, 0.5);
+            ctx.fillCircle(x - 25, y, 6);
+            ctx.fillCircle(x + 25, y, 6);
+        };
+
+        // 1. BORSOK (Golden/Yellow Pillow)
+        if (!this.textures.exists('borsok')) {
+            graphics.clear();
+            graphics.fillStyle(0xFFD700); // Gold
+            graphics.fillRoundedRect(10, 10, 108, 108, 20); // Squared pillow
+            // Highlight
+            graphics.fillStyle(0xFFFFFF, 0.3);
+            graphics.fillCircle(64, 50, 20);
+            drawFace(graphics, 64, 70);
+
+            graphics.generateTexture('borsok', 128, 128);
+        }
+
+        // 2. PAKHLAVA (Golden Rhombus) - Fallback if image missing
+        if (!this.textures.exists('pakhlava')) {
+            graphics.clear();
+            graphics.fillStyle(0xDAA520); // GoldenRod
+            // Draw diamond
+            graphics.beginPath();
+            graphics.moveTo(64, 10);
+            graphics.lineTo(118, 64);
+            graphics.lineTo(64, 118);
+            graphics.lineTo(10, 64);
+            graphics.closePath();
+            graphics.fillPath();
+
+            // Detail
+            graphics.lineStyle(3, 0xB8860B);
+            graphics.strokePath();
+
+            drawFace(graphics, 64, 64);
+            graphics.generateTexture('pakhlava', 128, 128);
+        }
+
+        // 3. LEPESHKA (Round bread) - if added later
+        if (!this.textures.exists('lepeshka')) {
+            graphics.clear();
+            graphics.fillStyle(0xF4A460); // SandyBrown
+            graphics.fillCircle(64, 64, 54);
+            graphics.lineStyle(4, 0x8B4513);
+            graphics.strokeCircle(64, 64, 54);
+            drawFace(graphics, 64, 64);
+            graphics.generateTexture('lepeshka', 128, 128);
         }
     }
 }
