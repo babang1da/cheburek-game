@@ -36,9 +36,9 @@ export class GameScene extends Phaser.Scene {
     preload() {
         // Load all food sprites
         FOOD_TYPES.forEach(type => {
-            this.load.image(type, `assets/${type}.png`);
+            this.load.image(type, `assets/${type}.webp`);
         });
-        this.load.image('background', 'assets/background.png');
+        this.load.image('background', 'assets/background.webp');
     }
 
     create() {
