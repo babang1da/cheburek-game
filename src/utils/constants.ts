@@ -20,3 +20,5 @@ export const DESTROY_DURATION = 150;
 export const INITIAL_MOVES = 30;
 export const TARGET_SCORE = 1000;
 export const POINTS_PER_GEM = 10;
+export const SHUFFLE_ATTEMPTS = 50;
+export const HINT_DELAY = 5000;

@@ -7,6 +7,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
     public foodType: string;
     public isMoving: boolean = false;
     public isMatched: boolean = false;
+    public specialType: 'none' | 'bomb' | 'rainbow' | 'row_clear' | 'col_clear' = 'none';
 
     constructor(
         scene: Phaser.Scene,
@@ -150,5 +151,19 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
             duration: 100,
             ease: 'Power2'
         });
+    }
+
+    setSpecialGlow(type: 'bomb' | 'rainbow' | 'row_clear' | 'col_clear') {
+        this.specialType = type;
+        if (this.postFX) {
+            const glowColors: Record<string, number> = {
+                bomb: 0xff4444,
+                rainbow: 0xff00ff,
+                row_clear: 0x44ff44,
+                col_clear: 0x4488ff,
+            };
+            // Remove old shadow and add colored glow
+            this.postFX.addGlow(glowColors[type] || 0xffffff, 6, 0, false, 0.1, 16);
+        }
     }
 }

@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { FoodItem } from '../objects/FoodItem';
 import { MatchFinder, type MatchResult } from '../utils/MatchFinder';
+import { soundManager } from '../utils/SoundManager';
+import { LevelManager } from '../utils/LevelManager';
 import {
     GRID_ROWS,
     GRID_COLS,
@@ -10,8 +12,9 @@ import {
     FOOD_TYPES,
     FOOD_COUNT,
     INITIAL_MOVES,
-    TARGET_SCORE,
-    POINTS_PER_GEM
+    POINTS_PER_GEM,
+    SHUFFLE_ATTEMPTS,
+    HINT_DELAY
 } from '../utils/constants';
 
 export class GameScene extends Phaser.Scene {
@@ -29,6 +32,14 @@ export class GameScene extends Phaser.Scene {
     private comboText!: Phaser.GameObjects.Text;
     private gameOverPanel!: Phaser.GameObjects.Container;
 
+    private soundBtn!: Phaser.GameObjects.Text;
+    private hintTimer: Phaser.Time.TimerEvent | null = null;
+    private hintItems: FoodItem[] = [];
+
+    private levelManager: LevelManager = new LevelManager();
+    private progressBar!: Phaser.GameObjects.Graphics;
+    private targetScore: number = 0;
+
     constructor() {
         super({ key: 'GameScene' });
     }
@@ -41,7 +52,7 @@ export class GameScene extends Phaser.Scene {
         this.load.image('background', 'assets/background.webp');
     }
 
-    create() {
+    async create() {
         // Generate textures for items that might be missing assets
         this.generateTextures();
 
@@ -81,18 +92,36 @@ export class GameScene extends Phaser.Scene {
 
         this.fillBoard();
 
+        // Check for deadlock
+        await this.checkAndReshuffle();
+
         // Update UI
         this.updateUI();
     }
 
     private createUI() {
-        // Title
-        this.add.text(360, 50, 'SAMSA SWAP', {
-            fontSize: '48px',
+        const config = this.levelManager.getConfig();
+        this.targetScore = config.targetScore;
+        this.movesRemaining = config.moves;
+
+        // Title with level
+        this.add.text(360, 45, 'SAMSA SWAP', {
+            fontSize: '36px',
             fontFamily: 'Arial',
             color: '#ff6b35',
             fontStyle: 'bold'
         }).setOrigin(0.5);
+
+        // Level
+        this.add.text(360, 80, `Уровень ${config.level}: ${config.name}`, {
+            fontSize: '18px',
+            fontFamily: 'Arial',
+            color: '#ffcc00',
+        }).setOrigin(0.5);
+
+        // Progress bar background
+        this.progressBar = this.add.graphics();
+        this.drawProgressBar();
 
         // Score
         this.scoreText = this.add.text(50, 100, 'Счёт: 0', {
@@ -109,7 +138,7 @@ export class GameScene extends Phaser.Scene {
         });
 
         // Target
-        this.add.text(400, 100, `Цель: ${TARGET_SCORE}`, {
+        this.add.text(500, 100, `Цель: ${config.targetScore}`, {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffcc00'
@@ -129,6 +158,15 @@ export class GameScene extends Phaser.Scene {
             color: '#ff00ff',
             fontStyle: 'bold'
         }).setOrigin(0.5).setVisible(false);
+
+        // Sound toggle button
+        this.soundBtn = this.add.text(670, 100, '🔊', {
+            fontSize: '32px',
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        this.soundBtn.on('pointerdown', () => {
+            soundManager.setEnabled(!soundManager.isEnabled());
+            this.soundBtn.setText(soundManager.isEnabled() ? '🔊' : '🔇');
+        });
 
         // Game over panel (hidden initially)
         this.createGameOverPanel();
@@ -351,7 +389,9 @@ export class GameScene extends Phaser.Scene {
         const matches = this.findMatches();
 
         if (matches.length > 0) {
+            soundManager.playSwap();
             this.movesRemaining--;
+            this.resetHintTimer();
             this.updateUI();
             this.comboLevel = 0;
             await this.processMatches(matches);
@@ -396,17 +436,89 @@ export class GameScene extends Phaser.Scene {
         this.updateUI();
         this.showCombo();
 
+        // Sound effects
+        const maxMatchLen = Math.max(...matches.map(m => m.positions.length));
+        soundManager.playMatch(maxMatchLen);
+        if (this.comboLevel > 1) {
+            soundManager.playCombo(this.comboLevel);
+        }
+
+        // Screen shake on big combos
+        if (this.comboLevel >= 3) {
+            this.cameras.main.shake(200, 0.005 * this.comboLevel);
+        }
+
         const toDestroy: FoodItem[] = [];
+        const specialSpawns: { row: number; col: number; type: 'bomb' | 'rainbow' | 'row_clear' | 'col_clear'; foodType: string }[] = [];
+
+        // Activate special tile effects
         matches.forEach(match => {
             match.positions.forEach(pos => {
                 const item = this.grid[pos.row][pos.col];
-                if (item && !item.isMatched) {
+                if (item && item.specialType !== 'none' && !item.isMatched) {
                     item.isMatched = true;
                     toDestroy.push(item);
                     this.grid[pos.row][pos.col] = null;
+                    this.activateSpecial(item, pos.row, pos.col, matches, toDestroy);
                 }
             });
         });
+
+        matches.forEach(match => {
+            // Determine if this match should create a special tile
+            const len = match.positions.length;
+            let specialType: 'bomb' | 'rainbow' | 'row_clear' | 'col_clear' | null = null;
+
+            if (len >= 5) {
+                specialType = 'rainbow';
+            } else if (len === 4) {
+                specialType = 'bomb';
+            }
+
+            match.positions.forEach((pos, idx) => {
+                const item = this.grid[pos.row][pos.col];
+                if (item && !item.isMatched) {
+                    // If this is a special-creating match and this is the center position, mark it
+                    if (specialType && idx === Math.floor(len / 2)) {
+                        specialSpawns.push({
+                            row: pos.row,
+                            col: pos.col,
+                            type: specialType,
+                            foodType: item.foodType,
+                        });
+                        // Don't destroy this item — it becomes special
+                        return;
+                    }
+
+                    item.isMatched = true;
+                    toDestroy.push(item);
+                    this.grid[pos.row][pos.col] = null;
+
+                    // Score popup at match position
+                    const points = POINTS_PER_GEM * this.comboLevel;
+                    this.showScorePopup(
+                        GRID_OFFSET_X + pos.col * CELL_SIZE,
+                        GRID_OFFSET_Y + pos.row * CELL_SIZE,
+                        points
+                    );
+
+                    // Simple particle burst
+                    this.emitParticles(
+                        GRID_OFFSET_X + pos.col * CELL_SIZE,
+                        GRID_OFFSET_Y + pos.row * CELL_SIZE,
+                        item.foodType
+                    );
+                }
+            });
+        });
+
+        // Apply special tile effects
+        for (const spawn of specialSpawns) {
+            const item = this.grid[spawn.row][spawn.col];
+            if (item) {
+                item.setSpecialGlow(spawn.type);
+            }
+        }
 
         await Promise.all(toDestroy.map(item => item.animateDestroy()));
 
@@ -417,8 +529,183 @@ export class GameScene extends Phaser.Scene {
         if (newMatches.length > 0) {
             await this.processMatches(newMatches);
         } else {
+            await this.checkAndReshuffle();
             this.checkGameState();
         }
+    }
+
+    private activateSpecial(item: FoodItem, row: number, col: number, _matches: MatchResult[], toDestroy: FoodItem[]) {
+        switch (item.specialType) {
+            case 'bomb':
+                // Destroy 3×3 area around the bomb
+                for (let r = row - 1; r <= row + 1; r++) {
+                    for (let c = col - 1; c <= col + 1; c++) {
+                        if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
+                            const target = this.grid[r][c];
+                            if (target && !target.isMatched) {
+                                target.isMatched = true;
+                                toDestroy.push(target);
+                                this.grid[r][c] = null;
+                                this.showScorePopup(
+                                    GRID_OFFSET_X + c * CELL_SIZE,
+                                    GRID_OFFSET_Y + r * CELL_SIZE,
+                                    POINTS_PER_GEM * this.comboLevel
+                                );
+                            }
+                        }
+                    }
+                }
+                this.cameras.main.shake(150, 0.008);
+                break;
+
+            case 'rainbow':
+                // Destroy all items of a random type (excluding other specials)
+                const allTypes = new Set<string>();
+                for (let r = 0; r < GRID_ROWS; r++) {
+                    for (let c = 0; c < GRID_COLS; c++) {
+                        const t = this.grid[r][c];
+                        if (t && t.specialType === 'none' && !t.isMatched) {
+                            allTypes.add(t.foodType);
+                        }
+                    }
+                }
+                if (allTypes.size > 0) {
+                    const typesArr = Array.from(allTypes);
+                    const chosenType = typesArr[Math.floor(Math.random() * typesArr.length)];
+                    for (let r = 0; r < GRID_ROWS; r++) {
+                        for (let c = 0; c < GRID_COLS; c++) {
+                            const t = this.grid[r][c];
+                            if (t && t.foodType === chosenType && !t.isMatched) {
+                                t.isMatched = true;
+                                toDestroy.push(t);
+                                this.grid[r][c] = null;
+                                this.showScorePopup(
+                                    GRID_OFFSET_X + c * CELL_SIZE,
+                                    GRID_OFFSET_Y + r * CELL_SIZE,
+                                    POINTS_PER_GEM * this.comboLevel
+                                );
+                            }
+                        }
+                    }
+                }
+                this.cameras.main.flash(300, 255, 255, 255, false);
+                break;
+
+            case 'row_clear':
+                // Destroy entire row
+                for (let c = 0; c < GRID_COLS; c++) {
+                    const t = this.grid[row][c];
+                    if (t && !t.isMatched) {
+                        t.isMatched = true;
+                        toDestroy.push(t);
+                        this.grid[row][c] = null;
+                        this.showScorePopup(
+                            GRID_OFFSET_X + c * CELL_SIZE,
+                            GRID_OFFSET_Y + row * CELL_SIZE,
+                            POINTS_PER_GEM * this.comboLevel
+                        );
+                    }
+                }
+                break;
+
+            case 'col_clear':
+                // Destroy entire column
+                for (let r = 0; r < GRID_ROWS; r++) {
+                    const t = this.grid[r][col];
+                    if (t && !t.isMatched) {
+                        t.isMatched = true;
+                        toDestroy.push(t);
+                        this.grid[r][col] = null;
+                        this.showScorePopup(
+                            GRID_OFFSET_X + col * CELL_SIZE,
+                            GRID_OFFSET_Y + r * CELL_SIZE,
+                            POINTS_PER_GEM * this.comboLevel
+                        );
+                    }
+                }
+                break;
+        }
+    }
+
+    private async checkAndReshuffle() {
+        const typeGrid = this.buildTypeGrid();
+        if (!MatchFinder.hasValidMoves(typeGrid)) {
+            await this.reshuffleBoard();
+        }
+    }
+
+    private async reshuffleBoard() {
+        // Collect all items
+        const items: FoodItem[] = [];
+        for (let row = 0; row < GRID_ROWS; row++) {
+            for (let col = 0; col < GRID_COLS; col++) {
+                const item = this.grid[row][col];
+                if (item) items.push(item);
+            }
+        }
+
+        for (let attempt = 0; attempt < SHUFFLE_ATTEMPTS; attempt++) {
+            // Fisher-Yates shuffle of food types
+            const types = items.map(i => i.foodType);
+            for (let i = types.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [types[i], types[j]] = [types[j], types[i]];
+            }
+
+            // Build temp grid
+            const tempGrid: (string | null)[][] = [];
+            for (let row = 0; row < GRID_ROWS; row++) {
+                tempGrid[row] = [];
+                for (let col = 0; col < GRID_COLS; col++) {
+                    tempGrid[row][col] = null;
+                }
+            }
+            items.forEach((item, idx) => {
+                tempGrid[item.gridRow][item.gridCol] = types[idx];
+            });
+
+            // Check no initial matches and has valid moves
+            const initialMatches = MatchFinder.findAllMatches(tempGrid);
+            if (initialMatches.length === 0 && MatchFinder.hasValidMoves(tempGrid)) {
+                // Apply new types
+                items.forEach((item, idx) => {
+                    if (item.foodType !== types[idx]) {
+                        item.foodType = types[idx];
+                        item.setTexture(types[idx]);
+                        // Recalculate scale for new texture
+                        const maxSize = CELL_SIZE - 10;
+                        const scale = Math.min(maxSize / item.width, maxSize / item.height);
+                        item.setScale(scale);
+                    }
+                });
+                // Flash animation
+                await Promise.all(items.map(item => {
+                    return new Promise<void>(resolve => {
+                        this.tweens.add({
+                            targets: item,
+                            alpha: 0.3,
+                            duration: 150,
+                            yoyo: true,
+                            onComplete: () => resolve()
+                        });
+                    });
+                }));
+                return;
+            }
+        }
+        // If no valid arrangement found after attempts, just keep current state
+    }
+
+    private buildTypeGrid(): (string | null)[][] {
+        const grid: (string | null)[][] = [];
+        for (let row = 0; row < GRID_ROWS; row++) {
+            grid[row] = [];
+            for (let col = 0; col < GRID_COLS; col++) {
+                const item = this.grid[row][col];
+                grid[row][col] = item ? item.foodType : null;
+            }
+        }
+        return grid;
     }
 
     private async dropItems() {
@@ -477,6 +764,29 @@ export class GameScene extends Phaser.Scene {
     private updateUI() {
         this.scoreText.setText(`Счёт: ${this.score}`);
         this.movesText.setText(`Ходы: ${this.movesRemaining}`);
+        this.drawProgressBar();
+    }
+
+    private drawProgressBar() {
+        const barX = 70;
+        const barY = 170;
+        const barW = 580;
+        const barH = 12;
+        const progress = Math.min(this.score / this.targetScore, 1);
+
+        this.progressBar.clear();
+        // Background
+        this.progressBar.fillStyle(0x333333, 0.8);
+        this.progressBar.fillRoundedRect(barX, barY, barW, barH, 6);
+        // Progress
+        if (progress > 0) {
+            const color = progress >= 1 ? 0x00ff88 : 0xff6b35;
+            this.progressBar.fillStyle(color, 1);
+            this.progressBar.fillRoundedRect(barX, barY, barW * progress, barH, 6);
+        }
+        // Border
+        this.progressBar.lineStyle(2, 0xffffff, 0.3);
+        this.progressBar.strokeRoundedRect(barX, barY, barW, barH, 6);
     }
 
     private showCombo() {
@@ -490,20 +800,149 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
+    private showScorePopup(x: number, y: number, points: number) {
+        const text = this.add.text(x, y - 20, `+${points}`, {
+            fontSize: '22px',
+            fontFamily: 'Arial',
+            color: '#ffcc00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 3,
+        }).setOrigin(0.5).setDepth(50);
+
+        this.tweens.add({
+            targets: text,
+            y: y - 70,
+            alpha: 0,
+            duration: 800,
+            ease: 'Power2',
+            onComplete: () => text.destroy()
+        });
+    }
+
+    private emitParticles(x: number, y: number, foodType: string) {
+        const colors: Record<string, number> = {
+            manti: 0xffffff,
+            belyash: 0xffcc00,
+            cheburek: 0xff8844,
+            samsa: 0xffaa33,
+            pakhlava: 0xdaa520,
+            borsok: 0xffd700,
+        };
+        const color = colors[foodType] || 0xffffff;
+
+        for (let i = 0; i < 6; i++) {
+            const particle = this.add.circle(x, y, Phaser.Math.Between(2, 5), color, 0.8)
+                .setDepth(49);
+
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 30 + Math.random() * 50;
+
+            this.tweens.add({
+                targets: particle,
+                x: x + Math.cos(angle) * speed,
+                y: y + Math.sin(angle) * speed,
+                alpha: 0,
+                scale: 0,
+                duration: 400,
+                ease: 'Power2',
+                onComplete: () => particle.destroy()
+            });
+        }
+    }
+
+    // Hint system
+    private resetHintTimer() {
+        this.clearHint();
+        if (this.hintTimer) {
+            this.hintTimer.remove(false);
+            this.hintTimer = null;
+        }
+        this.hintTimer = this.time.delayedCall(HINT_DELAY, () => {
+            this.showHint();
+        });
+    }
+
+    private clearHint() {
+        this.hintItems.forEach(item => {
+            if (item && item.scene) {
+                item.clearTint();
+            }
+        });
+        this.hintItems = [];
+    }
+
+    private showHint() {
+        const typeGrid = this.buildTypeGrid();
+        for (let row = 0; row < GRID_ROWS; row++) {
+            for (let col = 0; col < GRID_COLS; col++) {
+                // Try right swap
+                if (col < GRID_COLS - 1) {
+                    const tempGrid = typeGrid.map(r => [...r]);
+                    const t = tempGrid[row][col];
+                    tempGrid[row][col] = tempGrid[row][col + 1];
+                    tempGrid[row][col + 1] = t;
+                    const m = MatchFinder.findAllMatches(tempGrid);
+                    if (m.length > 0) {
+                        this.highlightHintPair(row, col, row, col + 1);
+                        return;
+                    }
+                }
+                // Try down swap
+                if (row < GRID_ROWS - 1) {
+                    const tempGrid = typeGrid.map(r => [...r]);
+                    const t = tempGrid[row][col];
+                    tempGrid[row][col] = tempGrid[row + 1][col];
+                    tempGrid[row + 1][col] = t;
+                    const m = MatchFinder.findAllMatches(tempGrid);
+                    if (m.length > 0) {
+                        this.highlightHintPair(row, col, row + 1, col);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private highlightHintPair(r1: number, c1: number, r2: number, c2: number) {
+        const item1 = this.grid[r1][c1];
+        const item2 = this.grid[r2][c2];
+        if (item1) {
+            item1.setTint(0xffff88);
+            this.hintItems.push(item1);
+        }
+        if (item2) {
+            item2.setTint(0xffff88);
+            this.hintItems.push(item2);
+        }
+    }
+
     private checkGameState() {
-        if (this.score >= TARGET_SCORE) {
+        if (this.score >= this.targetScore) {
+            this.clearHint();
             this.gameWin();
         } else if (this.movesRemaining <= 0) {
+            this.clearHint();
             this.gameLose();
+        } else {
+            this.resetHintTimer();
         }
     }
 
     private gameWin() {
+        soundManager.playWin();
         this.saveBestScore();
-        this.showGameOver('ПОБЕДА!', true);
+        this.levelManager.nextLevel();
+        if (this.levelManager.isLastLevel()) {
+            this.showGameOver('ВСЕ УРОВНИ ПРОЙДЕНЫ! 🏆', true);
+        } else {
+            const nextConfig = this.levelManager.getConfig();
+            this.showGameOver(`УРОВЕНЬ ${nextConfig.level - 1} ПРОЙДЕН!`, true);
+        }
     }
 
     private gameLose() {
+        soundManager.playLose();
         this.saveBestScore();
         this.showGameOver('ИГРА ОКОНЧЕНА', false);
     }
