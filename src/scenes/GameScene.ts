@@ -1084,19 +1084,36 @@ export class GameScene extends Phaser.Scene {
     private gameWin() {
         soundManager.playWin();
         this.saveBestScore();
+        
+        // Calculate and save stars
+        const stars = this.levelManager.calculateStars(this.score, this.targetScore);
+        const currentLevel = this.levelManager.getLevel();
+        this.levelManager.setStars(currentLevel, stars);
+        
         this.levelManager.nextLevel();
+        
         if (this.levelManager.isLastLevel()) {
             this.showGameOver('ВСЕ УРОВНИ ПРОЙДЕНЫ! 🏆', true);
         } else {
             const nextConfig = this.levelManager.getConfig();
             this.showGameOver(`УРОВЕНЬ ${nextConfig.level - 1} ПРОЙДЕН!`, true);
         }
+        
+        // Navigate to World Map after delay
+        this.time.delayedCall(2500, () => {
+            this.scene.start('WorldMapScene');
+        });
     }
 
     private gameLose() {
         soundManager.playLose();
         this.saveBestScore();
         this.showGameOver('ИГРА ОКОНЧЕНА', false);
+        
+        // Navigate to World Map after delay
+        this.time.delayedCall(2500, () => {
+            this.scene.start('WorldMapScene');
+        });
     }
 
     private showGameOver(title: string, isWin: boolean) {

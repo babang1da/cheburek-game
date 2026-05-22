@@ -32,19 +32,61 @@ export class LevelManager {
     }
 
     nextLevel() {
-        this.currentLevel++;
-        if (this.currentLevel > LEVELS.length) {
-            this.currentLevel = LEVELS.length; // Stay at last level
+        if (this.currentLevel < LEVELS.length) {
+            this.currentLevel++;
+            this.saveLevel();
         }
-        this.saveLevel();
     }
 
     resetLevel() {
+        this.currentLevel = 1;
         this.saveLevel();
     }
 
     isLastLevel(): boolean {
         return this.currentLevel >= LEVELS.length;
+    }
+
+    // Star tracking: 0-3 stars per level
+    getStars(level: number): number {
+        try {
+            const saved = localStorage.getItem(`samsa_swap_stars_${level}`);
+            if (saved) {
+                return Math.max(0, Math.min(3, parseInt(saved, 10)));
+            }
+        } catch { /* ignore */ }
+        return 0;
+    }
+
+    setStars(level: number, stars: number) {
+        try {
+            localStorage.setItem(`samsa_swap_stars_${level}`, Math.min(3, Math.max(0, stars)).toString());
+        } catch { /* ignore */ }
+    }
+
+    // Calculate stars based on score vs target
+    calculateStars(score: number, targetScore: number): number {
+        const ratio = score / targetScore;
+        if (ratio >= 2) return 3;
+        if (ratio >= 1.5) return 2;
+        if (ratio >= 1) return 1;
+        return 0;
+    }
+
+    // Get max unlocked level (based on stars > 0)
+    getMaxUnlockedLevel(): number {
+        let max = 1;
+        for (let i = LEVELS.length; i >= 1; i--) {
+            if (this.getStars(i) > 0 || i === 1) {
+                max = i;
+                break;
+            }
+        }
+        return Math.max(1, max);
+    }
+
+    getTotalLevels(): number {
+        return LEVELS.length;
     }
 
     private loadLevel(): number {
@@ -59,6 +101,8 @@ export class LevelManager {
     }
 
     private saveLevel() {
-        localStorage.setItem('samsa_swap_level', this.currentLevel.toString());
+        try {
+            localStorage.setItem('samsa_swap_level', this.currentLevel.toString());
+        } catch { /* ignore */ }
     }
 }

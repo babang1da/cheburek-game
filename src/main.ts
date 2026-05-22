@@ -1,6 +1,7 @@
 import './style.css';
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
+import { WorldMapScene } from './scenes/WorldMapScene';
 import { GameScene } from './scenes/GameScene';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -17,7 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
     antialias: true,
     pixelArt: false,
   },
-  scene: [BootScene, GameScene],
+  scene: [BootScene, WorldMapScene, GameScene],
 };
 
 new Phaser.Game(config);
