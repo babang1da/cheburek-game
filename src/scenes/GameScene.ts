@@ -115,6 +115,20 @@ export class GameScene extends Phaser.Scene {
         });
     }
 
+    update() {
+        // Sync shadow positions with items (cheap operation)
+        for (let row = 0; row < GRID_ROWS; row++) {
+            for (let col = 0; col < GRID_COLS; col++) {
+                const item = this.grid[row][col];
+                if (item && item.shadow) {
+                    item.shadow.x = item.x;
+                    item.shadow.y = item.y + 4;
+                    item.shadow.setDepth(item.depth - 1);
+                }
+            }
+        }
+    }
+
     // Removed update() — FPS text now updated via timer every 500ms
 
     private startIdleTimer() {
@@ -290,6 +304,21 @@ export class GameScene extends Phaser.Scene {
         const item = new FoodItem(this, row, col, foodType, x, y);
 
         this.grid[row][col] = item;
+
+        // Create optimized shadow (pre-rendered texture, cheap Sprite)
+        const shadow = this.add.sprite(x, y + 4, 'item_shadow');
+        shadow.setOrigin(0.5, 0.5);
+        shadow.setAlpha(0.6);
+        shadow.setDepth(item.depth - 1); // Render below item
+        item.shadow = shadow;
+
+        // Cleanup shadow when item is destroyed
+        item.once('destroy', () => {
+            if (item.shadow) {
+                item.shadow.destroy();
+                item.shadow = null;
+            }
+        });
 
         // Swipe/drag handler only (no click)
         item.on('dragstart', (_pointer: Phaser.Input.Pointer) => {
@@ -1027,6 +1056,13 @@ export class GameScene extends Phaser.Scene {
         }
     }
     private generateTextures() {
+        // Generate shadow texture (rendered once, used as cheap Sprite)
+        const shadowGfx = this.make.graphics({ x: 0, y: 0 });
+        shadowGfx.fillStyle(0x000000, 0.25);
+        shadowGfx.fillEllipse(CELL_SIZE / 2, CELL_SIZE / 2 + 4, CELL_SIZE - 16, 18);
+        shadowGfx.generateTexture('item_shadow', CELL_SIZE, CELL_SIZE);
+        shadowGfx.destroy();
+
         const graphics = this.make.graphics({ x: 0, y: 0 });
 
         // Helper to draw kawaii face

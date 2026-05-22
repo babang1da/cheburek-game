@@ -9,6 +9,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
     public isMatched: boolean = false;
     public isTweening: boolean = false;
     public specialType: 'none' | 'bomb' | 'rainbow' | 'row_clear' | 'col_clear' = 'none';
+    public shadow: Phaser.GameObjects.Sprite | null = null;
 
     constructor(
         scene: Phaser.Scene,
