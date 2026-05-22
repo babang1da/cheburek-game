@@ -102,13 +102,20 @@ export class GameScene extends Phaser.Scene {
 
         // Start single idle animation timer instead of 54 per-item timers
         this.startIdleTimer();
+
+        // FPS counter update timer (every 500ms, not every frame!)
+        this.time.addEvent({
+            delay: 500,
+            loop: true,
+            callback: () => {
+                if (this.fpsText) {
+                    this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
+                }
+            }
+        });
     }
 
-    update() {
-        if (this.fpsText) {
-            this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
-        }
-    }
+    // Removed update() — FPS text now updated via timer every 500ms
 
     private startIdleTimer() {
         this.time.addEvent({
@@ -562,7 +569,7 @@ export class GameScene extends Phaser.Scene {
         for (const spawn of specialSpawns) {
             const item = this.grid[spawn.row][spawn.col];
             if (item) {
-                item.setSpecialGlow(spawn.type);
+                item.specialType = spawn.type;
             }
         }
 

@@ -34,11 +34,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
         // Ensure item is above grid
         this.setDepth(1);
 
-        // Shadow via pre-rendered texture tint (much cheaper than postFX)
-        // postFX.addShadow costs 1 render pass per sprite = 54 extra passes/frame
-        if (this.postFX) {
-            this.postFX.addShadow(-2, 2, 0.1, 1, 0x000000, 10, 0.1);
-        }
+        // No postFX effects — too expensive (54 extra render passes/frame)
 
         // Make interactive (default hitArea uses texture frame = rectangle, already optimized)
         this.setInteractive();
@@ -142,19 +138,5 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
             duration: 100,
             ease: 'Power2'
         });
-    }
-
-    setSpecialGlow(type: 'bomb' | 'rainbow' | 'row_clear' | 'col_clear') {
-        this.specialType = type;
-        if (this.postFX) {
-            const glowColors: Record<string, number> = {
-                bomb: 0xff4444,
-                rainbow: 0xff00ff,
-                row_clear: 0x44ff44,
-                col_clear: 0x4488ff,
-            };
-            // Remove old shadow and add colored glow
-            this.postFX.addGlow(glowColors[type] || 0xffffff, 6, 0, false, 0.1, 16);
-        }
     }
 }
