@@ -58,10 +58,21 @@ export class GameScene extends Phaser.Scene {
         // Generate textures for items that might be missing assets
         this.generateTextures();
 
-        // Background image via Phaser (not CSS — avoids alpha compositing overhead)
-        const bg = this.add.image(360, 540, 'background');
-        bg.setDisplaySize(720, 1080);
+        // Dynamic gradient background (no image overhead)
+        const bg = this.add.graphics();
+        bg.fillGradientStyle(0x1a0a2e, 0x1a0a2e, 0x4a2a5e, 0x4a2a5e, 1);
+        bg.fillRect(0, 0, 720, 1080);
         bg.setDepth(-1);
+
+        // Add subtle pattern dots for visual depth (cheap: 5% opacity)
+        const pattern = this.add.graphics();
+        for (let x = 0; x < 720; x += 40) {
+            for (let y = 0; y < 1080; y += 40) {
+                pattern.fillStyle(0xffffff, 0.05);
+                pattern.fillCircle(x, y, 1);
+            }
+        }
+        pattern.setDepth(-1);
 
         // Load best score
         this.bestScore = parseInt(localStorage.getItem('samsa_swap_best_score') || '0', 10);
@@ -155,52 +166,58 @@ export class GameScene extends Phaser.Scene {
         this.targetScore = config.targetScore;
         this.movesRemaining = config.moves;
 
-        // Title with level
-        this.add.text(360, 45, 'SAMSA SWAP', {
+        // Title with level - slide in from top
+        const title = this.add.text(360, -50, 'SAMSA SWAP', {
             fontSize: '36px',
             fontFamily: 'Arial',
             color: '#ff6b35',
             fontStyle: 'bold'
         }).setOrigin(0.5);
+        this.tweens.add({ targets: title, y: 45, duration: 800, ease: 'Back.easeOut' });
 
-        // Level
-        this.add.text(360, 80, `Уровень ${config.level}: ${config.name}`, {
+        // Level - fade in
+        const levelText = this.add.text(360, 80, `Уровень ${config.level}: ${config.name}`, {
             fontSize: '18px',
             fontFamily: 'Arial',
             color: '#ffcc00',
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setAlpha(0);
+        this.tweens.add({ targets: levelText, alpha: 1, duration: 600, delay: 300 });
 
         // Progress bar background
         this.progressBar = this.add.graphics();
         this.drawProgressBar();
 
-        // Score
-        this.scoreText = this.add.text(50, 100, 'Счёт: 0', {
+        // Score - slide from left
+        this.scoreText = this.add.text(-100, 100, 'Счёт: 0', {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffffff'
         });
+        this.tweens.add({ targets: this.scoreText, x: 50, duration: 600, ease: 'Power2', delay: 100 });
 
-        // Moves
-        this.movesText = this.add.text(50, 140, `Ходы: ${INITIAL_MOVES}`, {
+        // Moves - slide from left
+        this.movesText = this.add.text(-100, 140, `Ходы: ${INITIAL_MOVES}`, {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffffff'
         });
+        this.tweens.add({ targets: this.movesText, x: 50, duration: 600, ease: 'Power2', delay: 200 });
 
-        // Target
-        this.add.text(500, 100, `Цель: ${config.targetScore}`, {
+        // Target - slide from right
+        const targetText = this.add.text(820, 100, `Цель: ${config.targetScore}`, {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffcc00'
         });
+        this.tweens.add({ targets: targetText, x: 500, duration: 600, ease: 'Power2', delay: 300 });
 
-        // Best score
-        this.add.text(400, 140, `Рекорд: ${this.bestScore}`, {
+        // Best score - slide from right
+        const bestText = this.add.text(820, 140, `Рекорд: ${this.bestScore}`, {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#00ff88'
         });
+        this.tweens.add({ targets: bestText, x: 400, duration: 600, ease: 'Power2', delay: 400 });
 
         // Combo text (hidden initially)
         this.comboText = this.add.text(360, 950, '', {
@@ -210,10 +227,21 @@ export class GameScene extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(0.5).setVisible(false);
 
-        // Sound toggle button
+        // Sound toggle button with pulse animation
         this.soundBtn = this.add.text(670, 100, '🔊', {
             fontSize: '32px',
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        // Add pulse animation to sound button
+        this.tweens.add({
+            targets: this.soundBtn,
+            scaleX: 1.2,
+            scaleY: 1.2,
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
         this.soundBtn.on('pointerdown', () => {
             soundManager.setEnabled(!soundManager.isEnabled());
             this.soundBtn.setText(soundManager.isEnabled() ? '🔊' : '🔇');
@@ -909,8 +937,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     private emitParticles(x: number, y: number, foodType: string) {
-        // Throttle: skip if too many particles active
-        if (this.tweens.getTweens().length > 80) return;
+        // Optimized: limit active particles to 10 (pool-like behavior)
+        const activeParticles = this.children.getChildren().filter(c => c.active && c.name === 'particle').length;
+        if (activeParticles >= 10) return;
 
         const colors: Record<string, number> = {
             manti: 0xffffff,
@@ -922,12 +951,14 @@ export class GameScene extends Phaser.Scene {
         };
         const color = colors[foodType] || 0xffffff;
 
-        for (let i = 0; i < 4; i++) {
-            const particle = this.add.circle(x, y, Phaser.Math.Between(2, 5), color, 0.8)
-                .setDepth(49);
+        // Only emit 2 particles per match (reduced from 4)
+        for (let i = 0; i < 2; i++) {
+            const particle = this.add.circle(x, y, Phaser.Math.Between(2, 4), color, 0.8)
+                .setDepth(49)
+                .setName('particle');
 
             const angle = Math.random() * Math.PI * 2;
-            const speed = 30 + Math.random() * 50;
+            const speed = 20 + Math.random() * 30;
 
             this.tweens.add({
                 targets: particle,
@@ -935,7 +966,7 @@ export class GameScene extends Phaser.Scene {
                 y: y + Math.sin(angle) * speed,
                 alpha: 0,
                 scale: 0,
-                duration: 400,
+                duration: 300, // Reduced from 400ms
                 ease: 'Power2',
                 onComplete: () => particle.destroy()
             });
