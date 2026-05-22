@@ -2,8 +2,20 @@ import Phaser from 'phaser';
 import { LevelManager } from '../utils/LevelManager';
 import { LEVELS } from '../utils/LevelManager';
 
+interface LevelNode {
+    circle: Phaser.GameObjects.Arc;
+    levelText: Phaser.GameObjects.Text;
+    starText: Phaser.GameObjects.Text;
+    nameText: Phaser.GameObjects.Text;
+    config: typeof LEVELS[0];
+    level: number;
+    isUnlocked: boolean;
+}
+
 export class WorldMapScene extends Phaser.Scene {
     private levelManager: LevelManager;
+    private levelNodes: LevelNode[] = [];
+    private selectedNode: LevelNode | null = null;
 
     constructor() {
         super('WorldMapScene');
@@ -38,6 +50,9 @@ export class WorldMapScene extends Phaser.Scene {
         // Create level nodes
         this.createLevelNodes();
 
+        // Animate current level node
+        this.animateCurrentLevel();
+
         // Back button
         const backBtn = this.add.text(360, 1000, 'ВЕРНУТЬСЯ', {
             fontSize: '28px',
@@ -66,7 +81,7 @@ export class WorldMapScene extends Phaser.Scene {
 
             const isUnlocked = i <= this.levelManager.getMaxUnlockedLevel();
             const stars = this.levelManager.getStars(i);
-            const config = LEVELS[i - 1]; // Get correct config for this level
+            const config = LEVELS[i - 1];
 
             // Node circle
             const color = isUnlocked ? 0xff6b35 : 0x666666;
@@ -82,42 +97,97 @@ export class WorldMapScene extends Phaser.Scene {
             }).setOrigin(0.5);
 
             // Stars
-            this.add.text(x, y + 50, this.getStarString(stars), {
+            const starText = this.add.text(x, y + 50, this.getStarString(stars), {
                 fontSize: '20px'
             }).setOrigin(0.5);
 
             // Level name
-            this.add.text(x, y + 75, config.name, {
+            const nameText = this.add.text(x, y + 75, config.name, {
                 fontSize: '14px',
                 fontFamily: 'Arial',
                 color: isUnlocked ? '#ffffff' : '#666666'
             }).setOrigin(0.5);
 
+            const node: LevelNode = {
+                circle,
+                levelText,
+                starText,
+                nameText,
+                config,
+                level: i,
+                isUnlocked
+            };
+
+            this.levelNodes.push(node);
+
             if (isUnlocked) {
                 circle.setInteractive({ useHandCursor: true });
                 levelText.setInteractive({ useHandCursor: true });
 
-                circle.on('pointerdown', () => this.startLevel(i));
-                levelText.on('pointerdown', () => this.startLevel(i));
+                const clickHandler = () => this.selectLevel(node);
+                circle.on('pointerdown', clickHandler);
+                levelText.on('pointerdown', clickHandler);
 
-                circle.on('pointerover', () => circle.setScale(1.2));
-                circle.on('pointerout', () => circle.setScale(1));
+                circle.on('pointerover', () => {
+                    if (node !== this.selectedNode) {
+                        circle.setScale(1.2);
+                    }
+                });
+                circle.on('pointerout', () => {
+                    if (node !== this.selectedNode) {
+                        circle.setScale(1);
+                    }
+                });
             }
 
             // Draw path line from previous node
             if (i > 1) {
-                const prevX = 360 + Math.sin((i - 1) * 0.8) * 200;
-                const prevY = startY + (i - 2) * nodeSpacing;
+                const prevNode = this.levelNodes[i - 2];
                 const path = this.add.graphics();
                 path.lineStyle(6, 0x666666, 0.8);
-                path.lineBetween(prevX, prevY, x, y);
+                path.lineBetween(prevNode.circle.x, prevNode.circle.y, x, y);
             }
         }
     }
 
-    private startLevel(level: number) {
-        this.registry.set('selectedLevel', level);
+    private selectLevel(node: LevelNode) {
+        // Deselect previous
+        if (this.selectedNode) {
+            this.tweens.killTweensOf(this.selectedNode.circle);
+            this.selectedNode.circle.setScale(1);
+        }
+
+        this.selectedNode = node;
+
+        // Highlight selected
+        node.circle.setScale(1.3);
+
+        // Show level info and play button
+        this.showLevelPreview(node);
+    }
+
+    private showLevelPreview(node: LevelNode) {
+        // Brief preview - just start the level for now
+        this.registry.set('selectedLevel', node.level);
         this.scene.start('GameScene');
+    }
+
+    private animateCurrentLevel() {
+        const currentLevel = this.levelManager.getLevel();
+        const currentNode = this.levelNodes[currentLevel - 1];
+
+        if (currentNode && currentNode.isUnlocked) {
+            // Pulsing animation for current level
+            this.tweens.add({
+                targets: currentNode.circle,
+                scaleX: 1.15,
+                scaleY: 1.15,
+                duration: 800,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
     }
 
     private getStarString(stars: number): string {
