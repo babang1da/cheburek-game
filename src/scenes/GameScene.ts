@@ -47,6 +47,7 @@ export class GameScene extends Phaser.Scene {
     private boosterLightBall: number = 0;
     private boosterBomb: number = 0;
     private boosterDisco: number = 0;
+    private activeBooster: string | null = null;
 
     constructor() {
         super({ key: 'GameScene' });
@@ -401,8 +402,56 @@ export class GameScene extends Phaser.Scene {
     }
 
     private activateBooster(type: 'lightball' | 'bomb' | 'disco') {
-        // TODO: Implement booster activation logic
-        console.log(`Activating booster: ${type}`);
+        // Set active booster - next swap will trigger the effect
+        this.activeBooster = type;
+        soundManager.playClick();
+        console.log(`Active booster: ${type} - next swap will trigger effect`);
+    }
+
+    private applyBoosterEffect(type: string, item: FoodItem) {
+        const row = item.gridRow;
+        const col = item.gridCol;
+        
+        if (type === 'bomb') {
+            // Destroy 3x3 area
+            for (let r = Math.max(0, row - 1); r <= Math.min(8, row + 1); r++) {
+                for (let c = Math.max(0, col - 1); c <= Math.min(6, col + 1); c++) {
+                    const target = this.grid[r][c];
+                    if (target) this.destroyItem(target);
+                }
+            }
+        } else if (type === 'lightball') {
+            // Destroy all of same type
+            const targetType = item.foodType;
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 7; c++) {
+                    const target = this.grid[r][c];
+                    if (target && target.foodType === targetType) this.destroyItem(target);
+                }
+            }
+        } else if (type === 'disco') {
+            // Change all of one type to another
+            const targetType = item.foodType;
+            const newType = FOOD_TYPES[(FOOD_TYPES.indexOf(targetType) + 1) % FOOD_COUNT];
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 7; c++) {
+                    const target = this.grid[r][c];
+                    if (target && target.foodType === targetType) {
+                        target.setTexture(newType);
+                        target.foodType = newType;
+                    }
+                }
+            }
+        }
+        
+        this.dropItems();
+        this.fillEmptySpaces();
+        soundManager.playDestroy();
+    }
+
+    private destroyItem(item: FoodItem) {
+        item.destroy();
+        this.grid[item.gridRow][item.gridCol] = null;
     }
 
     private initGrid() {
@@ -574,6 +623,14 @@ export class GameScene extends Phaser.Scene {
 
     private async trySwap(item1: FoodItem, item2: FoodItem) {
         this.isProcessing = true;
+
+        // Check for active booster
+        if (this.activeBooster) {
+            this.applyBoosterEffect(this.activeBooster, item1);
+            this.activeBooster = null;
+            this.isProcessing = false;
+            return;
+        }
 
         const row1 = item1.gridRow, col1 = item1.gridCol;
         const row2 = item2.gridRow, col2 = item2.gridCol;
