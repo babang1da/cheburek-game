@@ -94,6 +94,32 @@ export class LevelManager {
         return LEVELS.length;
     }
 
+    // Coins system
+    getCoins(): number {
+        try {
+            const saved = localStorage.getItem('samsa_swap_coins');
+            if (saved) {
+                return parseInt(saved, 10);
+            }
+        } catch { /* ignore */ }
+        return 0;
+    }
+
+    addCoins(amount: number) {
+        const current = this.getCoins();
+        const newAmount = current + amount;
+        try {
+            localStorage.setItem('samsa_swap_coins', newAmount.toString());
+        } catch { /* ignore */ }
+    }
+
+    // Earn coins on level completion (100 per star)
+    earnLevelCoins(stars: number): number {
+        const coins = stars * 100;
+        this.addCoins(coins);
+        return coins;
+    }
+
     private loadLevel(): number {
         try {
             const saved = localStorage.getItem('samsa_swap_level');

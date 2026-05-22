@@ -30,6 +30,7 @@ export class GameScene extends Phaser.Scene {
     private scoreText!: Phaser.GameObjects.Text;
     private movesText!: Phaser.GameObjects.Text;
     private comboText!: Phaser.GameObjects.Text;
+    private coinsText!: Phaser.GameObjects.Text;
     private gameOverPanel!: Phaser.GameObjects.Container;
 
     private soundBtn!: Phaser.GameObjects.Text;
@@ -238,6 +239,15 @@ export class GameScene extends Phaser.Scene {
         });
         this.tweens.add({ targets: bestText, x: 580, duration: 600, ease: 'Power2', delay: 400 });
 
+        // Coins - top right (near best score)
+        const coins = this.levelManager.getCoins();
+        this.coinsText = this.add.text(820, 70, `🪙 ${coins}`, {
+            fontSize: '24px',
+            fontFamily: 'Arial',
+            color: '#ffcc00'
+        }).setOrigin(0.5, 0).setAlpha(0);
+        this.tweens.add({ targets: this.coinsText, x: 580, duration: 600, ease: 'Power2', delay: 500 });
+
         // Combo text (hidden initially)
         this.comboText = this.add.text(360, 950, '', {
             fontSize: '32px',
@@ -318,10 +328,18 @@ export class GameScene extends Phaser.Scene {
             restartBtn.setScale(1);
         });
 
-        this.gameOverPanel.add([bg, title, scoreText, restartBtn]);
+        // Coin reward text (hidden initially)
+        const coinText = this.add.text(0, 50, '', {
+            fontSize: '24px',
+            fontFamily: 'Arial',
+            color: '#ffcc00'
+        }).setOrigin(0.5).setVisible(false);
+
+        this.gameOverPanel.add([bg, title, scoreText, coinText, restartBtn]);
         this.gameOverPanel.setVisible(false);
         this.gameOverPanel.setData('scoreText', scoreText);
         this.gameOverPanel.setData('titleText', title);
+        this.gameOverPanel.setData('coinText', coinText);
     }
 
     private initGrid() {
@@ -1097,7 +1115,17 @@ export class GameScene extends Phaser.Scene {
         const currentLevel = this.levelManager.getLevel();
         this.levelManager.setStars(currentLevel, stars);
         
+        // Award coins (100 per star)
+        const coinsEarned = this.levelManager.earnLevelCoins(stars);
+        
         this.levelManager.nextLevel();
+        
+        // Show coins earned in game over panel
+        const coinText = this.gameOverPanel.getData('coinText') as Phaser.GameObjects.Text;
+        if (coinText) {
+            coinText.setText(`🪙 +${coinsEarned} монет`);
+            coinText.setVisible(true);
+        }
         
         if (this.levelManager.isLastLevel()) {
             this.showGameOver('ВСЕ УРОВНИ ПРОЙДЕНЫ! 🏆', true);
