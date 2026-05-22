@@ -166,16 +166,16 @@ export class GameScene extends Phaser.Scene {
         this.targetScore = config.targetScore;
         this.movesRemaining = config.moves;
 
-        // Title with level - slide in from top
+        // Title with level - top center
         const title = this.add.text(360, -50, 'SAMSA SWAP', {
             fontSize: '36px',
             fontFamily: 'Arial',
             color: '#ff6b35',
             fontStyle: 'bold'
         }).setOrigin(0.5);
-        this.tweens.add({ targets: title, y: 45, duration: 800, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: title, y: 30, duration: 800, ease: 'Back.easeOut' });
 
-        // Level - fade in
+        // Level - under title
         const levelText = this.add.text(360, 80, `Уровень ${config.level}: ${config.name}`, {
             fontSize: '18px',
             fontFamily: 'Arial',
@@ -183,41 +183,53 @@ export class GameScene extends Phaser.Scene {
         }).setOrigin(0.5).setAlpha(0);
         this.tweens.add({ targets: levelText, alpha: 1, duration: 600, delay: 300 });
 
-        // Progress bar background
+        // Progress bar background with star markers
         this.progressBar = this.add.graphics();
         this.drawProgressBar();
+        
+        // Star markers on progress bar (Royal Match style)
+        const barX = 50, barY = 175, barW = 620;
+        const starPositions = [0.33, 0.66, 1.0]; // 1, 2, 3 stars
+        starPositions.forEach((pct, idx) => {
+            const starX = barX + barW * pct;
+            const star = this.add.text(starX, barY - 5, '☆', {
+                fontSize: '16px',
+                color: '#ffcc00'
+            }).setOrigin(0.5).setAlpha(0);
+            this.tweens.add({ targets: star, alpha: 1, duration: 600, delay: 500 + idx * 100 });
+        });
 
-        // Score - slide from left
-        this.scoreText = this.add.text(-100, 100, 'Счёт: 0', {
+        // Score - top left
+        this.scoreText = this.add.text(-100, 10, 'Счёт: 0', {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffffff'
         });
-        this.tweens.add({ targets: this.scoreText, x: 50, duration: 600, ease: 'Power2', delay: 100 });
+        this.tweens.add({ targets: this.scoreText, x: 20, duration: 600, ease: 'Power2', delay: 100 });
 
-        // Moves - slide from left
-        this.movesText = this.add.text(-100, 140, `Ходы: ${INITIAL_MOVES}`, {
+        // Moves - under score
+        this.movesText = this.add.text(-100, 40, `Ходы: ${INITIAL_MOVES}`, {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffffff'
         });
-        this.tweens.add({ targets: this.movesText, x: 50, duration: 600, ease: 'Power2', delay: 200 });
+        this.tweens.add({ targets: this.movesText, x: 20, duration: 600, ease: 'Power2', delay: 200 });
 
-        // Target - slide from right
-        const targetText = this.add.text(820, 100, `Цель: ${config.targetScore}`, {
+        // Target - top right
+        const targetText = this.add.text(820, 10, `Цель: ${config.targetScore}`, {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffcc00'
         });
-        this.tweens.add({ targets: targetText, x: 500, duration: 600, ease: 'Power2', delay: 300 });
+        this.tweens.add({ targets: targetText, x: 580, duration: 600, ease: 'Power2', delay: 300 });
 
-        // Best score - slide from right
-        const bestText = this.add.text(820, 140, `Рекорд: ${this.bestScore}`, {
+        // Best score - under target
+        const bestText = this.add.text(820, 40, `Рекорд: ${this.bestScore}`, {
             fontSize: '24px',
             fontFamily: 'Arial',
             color: '#00ff88'
         });
-        this.tweens.add({ targets: bestText, x: 400, duration: 600, ease: 'Power2', delay: 400 });
+        this.tweens.add({ targets: bestText, x: 580, duration: 600, ease: 'Power2', delay: 400 });
 
         // Combo text (hidden initially)
         this.comboText = this.add.text(360, 950, '', {
@@ -227,8 +239,8 @@ export class GameScene extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(0.5).setVisible(false);
 
-        // Sound toggle button with pulse animation
-        this.soundBtn = this.add.text(670, 100, '🔊', {
+        // Sound toggle button - top right corner
+        this.soundBtn = this.add.text(700, 30, '🔊', {
             fontSize: '32px',
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
@@ -951,8 +963,9 @@ export class GameScene extends Phaser.Scene {
         };
         const color = colors[foodType] || 0xffffff;
 
-        // Only emit 2 particles per match (reduced from 4)
-        for (let i = 0; i < 2; i++) {
+        // Royal Match style: mix of sparkles and stars
+        for (let i = 0; i < 3; i++) {
+            // Main particle
             const particle = this.add.circle(x, y, Phaser.Math.Between(2, 4), color, 0.8)
                 .setDepth(49)
                 .setName('particle');
@@ -966,10 +979,27 @@ export class GameScene extends Phaser.Scene {
                 y: y + Math.sin(angle) * speed,
                 alpha: 0,
                 scale: 0,
-                duration: 300, // Reduced from 400ms
+                duration: 300,
                 ease: 'Power2',
                 onComplete: () => particle.destroy()
             });
+
+            // Sparkle particle (star-like, brighter)
+            if (i === 0) {
+                const sparkle = this.add.star(x, y, 4, 2, 5, 0xffffff, 0.9)
+                    .setDepth(50)
+                    .setName('particle')
+                    .setScale(0);
+
+                this.tweens.add({
+                    targets: sparkle,
+                    scale: 1,
+                    alpha: 0,
+                    duration: 400,
+                    ease: 'Back.easeOut',
+                    onComplete: () => sparkle.destroy()
+                });
+            }
         }
     }
 
