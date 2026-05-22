@@ -105,11 +105,11 @@ export class GameScene extends Phaser.Scene {
 
     private startIdleTimer() {
         this.time.addEvent({
-            delay: 4000,
+            delay: 2500,
             loop: true,
             callback: () => {
-                // Pick 2-3 random items to animate
-                const count = Phaser.Math.Between(2, 3);
+                // Animate 5-8 random items — keeps the lively feel
+                const count = Phaser.Math.Between(5, 8);
                 for (let i = 0; i < count; i++) {
                     const row = Phaser.Math.Between(0, GRID_ROWS - 1);
                     const col = Phaser.Math.Between(0, GRID_COLS - 1);
