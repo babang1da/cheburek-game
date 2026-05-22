@@ -1107,7 +1107,74 @@ export class GameScene extends Phaser.Scene {
         titleText.setColor(isWin ? '#00ff88' : '#ff6b35');
         scoreText.setText(`Финальный счёт: ${this.score}`);
 
+        // Royal Match style: animate panel in
+        this.gameOverPanel.setAlpha(0);
         this.gameOverPanel.setVisible(true);
+        this.tweens.add({
+            targets: this.gameOverPanel,
+            alpha: 1,
+            duration: 500,
+            ease: 'Power2'
+        });
+
+        // Show stars for win
+        if (isWin) {
+            this.showStars();
+        }
+    }
+
+    private showStars() {
+        // Calculate stars: 1 = reached target, 2 = 1.5x target, 3 = 2x target
+        const ratio = this.score / this.targetScore;
+        const starCount = ratio >= 2 ? 3 : ratio >= 1.5 ? 2 : 1;
+
+        // Star positions
+        const starPositions = [-80, 0, 80];
+        const starEmojis = ['⭐', '⭐', '⭐'];
+
+        starPositions.forEach((x, idx) => {
+            if (idx < starCount) {
+                const star = this.add.text(360 + x, 480, starEmojis[idx], {
+                    fontSize: '48px'
+                }).setOrigin(0.5).setScale(0).setDepth(101);
+
+                this.tweens.add({
+                    targets: star,
+                    scale: 1,
+                    duration: 400,
+                    delay: 300 + idx * 200,
+                    ease: 'Back.easeOut',
+                    onComplete: () => {
+                        // Sparkle effect
+                        this.emitConfetti(360 + x, 480);
+                        soundManager.playMatch(3); // Celebration sound
+                    }
+                });
+            }
+        });
+    }
+
+    private emitConfetti(x: number, y: number) {
+        // Celebration confetti like Royal Match
+        for (let i = 0; i < 8; i++) {
+            const confetti = this.add.circle(x, y, Phaser.Math.Between(3, 6), 
+                Phaser.Display.Color.RandomRGB().color, 0.9)
+                .setDepth(102).setName('particle');
+
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 50 + Math.random() * 80;
+
+            this.tweens.add({
+                targets: confetti,
+                x: x + Math.cos(angle) * speed,
+                y: y + Math.sin(angle) * speed - 50,
+                alpha: 0,
+                scale: 0,
+                duration: 800,
+                ease: 'Power2',
+                onComplete: () => confetti.destroy()
+            });
+        }
     }
 
     private saveBestScore() {
