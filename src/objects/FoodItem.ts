@@ -40,14 +40,8 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
             this.postFX.addShadow(-2, 2, 0.05, 1, 0x000000, 10, 0.15);
         }
 
-        // Make interactive with fixed bounding box (no pixel-perfect hit test)
-        this.setInteractive({
-            hitArea: new Phaser.Geom.Rectangle(
-                -CELL_SIZE / 2, -CELL_SIZE / 2,
-                CELL_SIZE, CELL_SIZE
-            ),
-            hitAreaCallback: Phaser.Geom.Rectangle.Contains,
-        });
+        // Make interactive (default hitArea uses texture frame = rectangle, already optimized)
+        this.setInteractive();
 
         scene.add.existing(this);
     }
@@ -137,6 +131,8 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
         this.setDepth(selected ? 2 : 1);
 
         // Kill any existing scale tweens to prevent tween pile-up
+        // CRITICAL: also reset isTweening since idle tween's onComplete won't fire
+        this.isTweening = false;
         this.scene.tweens.killTweensOf(this);
 
         this.scene.tweens.add({
