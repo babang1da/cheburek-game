@@ -37,7 +37,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
         // Shadow via pre-rendered texture tint (much cheaper than postFX)
         // postFX.addShadow costs 1 render pass per sprite = 54 extra passes/frame
         if (this.postFX) {
-            this.postFX.addShadow(-2, 2, 0.05, 1, 0x000000, 10, 0.15);
+            this.postFX.addShadow(-2, 2, 0.1, 1, 0x000000, 10, 0.1);
         }
 
         // Make interactive (default hitArea uses texture frame = rectangle, already optimized)
