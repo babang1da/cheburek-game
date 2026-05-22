@@ -35,6 +35,7 @@ export class GameScene extends Phaser.Scene {
     private soundBtn!: Phaser.GameObjects.Text;
     private hintTimer: Phaser.Time.TimerEvent | null = null;
     private hintItems: FoodItem[] = [];
+    private fpsText!: Phaser.GameObjects.Text;
 
     private levelManager: LevelManager = new LevelManager();
     private progressBar!: Phaser.GameObjects.Graphics;
@@ -101,6 +102,12 @@ export class GameScene extends Phaser.Scene {
 
         // Start single idle animation timer instead of 54 per-item timers
         this.startIdleTimer();
+    }
+
+    update() {
+        if (this.fpsText) {
+            this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
+        }
     }
 
     private startIdleTimer() {
@@ -190,6 +197,15 @@ export class GameScene extends Phaser.Scene {
             soundManager.setEnabled(!soundManager.isEnabled());
             this.soundBtn.setText(soundManager.isEnabled() ? '🔊' : '🔇');
         });
+
+        // FPS counter (top-right corner)
+        this.fpsText = this.add.text(710, 15, '', {
+            fontSize: '14px',
+            fontFamily: 'monospace',
+            color: '#00ff88',
+            backgroundColor: '#000000',
+            padding: { x: 4, y: 2 }
+        }).setOrigin(1, 0).setDepth(200).setAlpha(0.7);
 
         // Game over panel (hidden initially)
         this.createGameOverPanel();
@@ -1068,5 +1084,8 @@ export class GameScene extends Phaser.Scene {
             drawFace(graphics, 64, 64);
             graphics.generateTexture('lepeshka', 128, 128);
         }
+
+        // CRITICAL: destroy temp graphics to free GPU memory
+        graphics.destroy();
     }
 }

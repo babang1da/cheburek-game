@@ -7,6 +7,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
     public foodType: string;
     public isMoving: boolean = false;
     public isMatched: boolean = false;
+    public isTweening: boolean = false;
     public specialType: 'none' | 'bomb' | 'rainbow' | 'row_clear' | 'col_clear' = 'none';
 
     constructor(
@@ -33,13 +34,20 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
         // Ensure item is above grid
         this.setDepth(1);
 
-        // Add shadow effect (Phaser 3.60+)
+        // Shadow via pre-rendered texture tint (much cheaper than postFX)
+        // postFX.addShadow costs 1 render pass per sprite = 54 extra passes/frame
         if (this.postFX) {
-            this.postFX.addShadow(-2, 2, 0.1, 1, 0x000000, 10, 0.1);
+            this.postFX.addShadow(-2, 2, 0.05, 1, 0x000000, 10, 0.15);
         }
 
-        // Make interactive
-        this.setInteractive();
+        // Make interactive with fixed bounding box (no pixel-perfect hit test)
+        this.setInteractive({
+            hitArea: new Phaser.Geom.Rectangle(
+                -CELL_SIZE / 2, -CELL_SIZE / 2,
+                CELL_SIZE, CELL_SIZE
+            ),
+            hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+        });
 
         scene.add.existing(this);
     }
@@ -47,7 +55,8 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
     // Idle animation is now driven by a single scene-level timer in GameScene
     // (see GameScene.startIdleTimer). This method is called externally.
     animateIdleJump() {
-        if (this.isMoving) return;
+        if (this.isMoving || this.isTweening) return;
+        this.isTweening = true;
 
         const startY = this.y;
         const startScaleX = this.scaleX;
@@ -64,6 +73,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
             onComplete: () => {
                 this.y = startY;
                 this.setScale(startScaleX, startScaleY);
+                this.isTweening = false;
             }
         });
     }
