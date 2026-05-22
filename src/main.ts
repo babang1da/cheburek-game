@@ -8,10 +8,7 @@ const config: Phaser.Types.Core.GameConfig = {
   width: 720,
   height: 1080,
   parent: 'app',
-  backgroundColor: 'rgba(0,0,0,0)',
-  transparent: true,
-  roundPixels: true,
-  desynchronized: true,
+  backgroundColor: '#1a0a2e',
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

@@ -57,10 +57,10 @@ export class GameScene extends Phaser.Scene {
         // Generate textures for items that might be missing assets
         this.generateTextures();
 
-        // Background (transparent, handled by CSS)
-        // const bg = this.add.image(360, 540, 'background');
-        // bg.setDisplaySize(720, 1080);
-        // bg.setAlpha(0); 
+        // Background image via Phaser (not CSS — avoids alpha compositing overhead)
+        const bg = this.add.image(360, 540, 'background');
+        bg.setDisplaySize(720, 1080);
+        bg.setDepth(-1);
 
         // Load best score
         this.bestScore = parseInt(localStorage.getItem('samsa_swap_best_score') || '0', 10);
@@ -272,14 +272,17 @@ export class GameScene extends Phaser.Scene {
         item.on('dragstart', (_pointer: Phaser.Input.Pointer) => {
             if (!this.isProcessing && !item.isMoving) {
                 this.selectedItem = item;
-                item.animateSelect(true);
+                item.isMoving = true; // Prevent idle animation during drag
+                item.setDepth(10); // Bring to front while dragging
+                this.clearHint();
+                this.resetHintTimer();
             }
         });
 
         item.on('drag', (_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
             if (this.isProcessing || !this.selectedItem) return;
 
-            // Move item with pointer
+            // Direct position update — fast, no tween overhead
             item.x = dragX;
             item.y = dragY;
         });
@@ -291,6 +294,8 @@ export class GameScene extends Phaser.Scene {
             if (!this.selectedItem || this.isProcessing) {
                 item.x = startX;
                 item.y = startY;
+                item.isMoving = false;
+                item.setDepth(1);
                 return;
             }
 
@@ -318,7 +323,8 @@ export class GameScene extends Phaser.Scene {
             if (targetRow >= 0 && targetRow < GRID_ROWS && targetCol >= 0 && targetCol < GRID_COLS) {
                 const targetItem = this.grid[targetRow][targetCol];
                 if (targetItem && this.areAdjacent(item, targetItem)) {
-                    item.animateSelect(false);
+                    item.isMoving = false;
+                    item.setDepth(1);
                     this.trySwap(item, targetItem);
                     this.selectedItem = null;
                     return;
@@ -326,7 +332,8 @@ export class GameScene extends Phaser.Scene {
             }
 
             // Reset position if no valid swap
-            item.animateSelect(false);
+            item.isMoving = false;
+            item.setDepth(1);
             this.selectedItem = null;
             this.tweens.add({
                 targets: item,

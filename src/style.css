@@ -7,13 +7,7 @@
 body {
   margin: 0;
   padding: 0;
-  /* Use the game background for the whole page */
-  background-image: url('/assets/background.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-
+  background: #1a0a2e;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -23,9 +17,6 @@ body {
   font-family: 'Arial', sans-serif;
   overflow: hidden;
   touch-action: none;
-
-  /* Perf: prevent background repaint when canvas updates */
-  contain: layout style paint;
 }
 
 #app {
@@ -39,6 +30,4 @@ body {
 canvas {
   display: block;
   touch-action: none;
-  /* Perf: promote canvas to GPU layer — prevents drag stutter */
-  will-change: transform;
 }
