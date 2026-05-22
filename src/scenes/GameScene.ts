@@ -42,6 +42,11 @@ export class GameScene extends Phaser.Scene {
     private progressBar!: Phaser.GameObjects.Graphics;
     private targetScore: number = 0;
     private lastProgressPct: number = -1;
+    
+    // Boosters
+    private boosterLightBall: number = 0;
+    private boosterBomb: number = 0;
+    private boosterDisco: number = 0;
 
     constructor() {
         super({ key: 'GameScene' });
@@ -269,21 +274,20 @@ export class GameScene extends Phaser.Scene {
             duration: 800,
             yoyo: true,
             repeat: -1,
-            ease: 'Sine.easeInOut'
+            ease: 'Sine.easeInOut',
+            delay: 1200,
         });
+
         this.soundBtn.on('pointerdown', () => {
             soundManager.setEnabled(!soundManager.isEnabled());
             this.soundBtn.setText(soundManager.isEnabled() ? '🔊' : '🔇');
         });
 
-        // FPS counter (top-right corner)
-        this.fpsText = this.add.text(710, 15, '', {
-            fontSize: '14px',
-            fontFamily: 'monospace',
-            color: '#00ff88',
-            backgroundColor: '#000000',
-            padding: { x: 4, y: 2 }
-        }).setOrigin(1, 0).setDepth(200).setAlpha(0.7);
+        this.soundBtn.on('pointerover', () => this.soundBtn.setScale(1.2));
+        this.soundBtn.on('pointerout', () => this.soundBtn.setScale(1));
+
+        // Boosters panel - bottom of screen (Royal Match style)
+        this.createBoostersPanel();
 
         // Game over panel (hidden initially)
         this.createGameOverPanel();
@@ -340,6 +344,65 @@ export class GameScene extends Phaser.Scene {
         this.gameOverPanel.setData('scoreText', scoreText);
         this.gameOverPanel.setData('titleText', title);
         this.gameOverPanel.setData('coinText', coinText);
+    }
+
+    private createBoostersPanel() {
+        const panelY = 1020;
+        const spacing = 120;
+        const startX = 360 - spacing;
+
+        // Booster: Light Ball
+        const lightBallBtn = this.add.text(startX, panelY, `⚡ ${this.boosterLightBall}`, {
+            fontSize: '28px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        lightBallBtn.on('pointerdown', () => {
+            if (this.boosterLightBall > 0) {
+                this.boosterLightBall--;
+                this.activateBooster('lightball');
+            }
+        });
+
+        // Booster: Bomb
+        const bombBtn = this.add.text(startX + spacing, panelY, `💣 ${this.boosterBomb}`, {
+            fontSize: '28px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        bombBtn.on('pointerdown', () => {
+            if (this.boosterBomb > 0) {
+                this.boosterBomb--;
+                this.activateBooster('bomb');
+            }
+        });
+
+        // Booster: Disco Ball
+        const discoBtn = this.add.text(startX + spacing * 2, panelY, `🌈 ${this.boosterDisco}`, {
+            fontSize: '28px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        discoBtn.on('pointerdown', () => {
+            if (this.boosterDisco > 0) {
+                this.boosterDisco--;
+                this.activateBooster('disco');
+            }
+        });
+    }
+
+    private activateBooster(type: 'lightball' | 'bomb' | 'disco') {
+        // TODO: Implement booster activation logic
+        console.log(`Activating booster: ${type}`);
     }
 
     private initGrid() {
