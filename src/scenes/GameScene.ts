@@ -39,6 +39,7 @@ export class GameScene extends Phaser.Scene {
     private levelManager: LevelManager = new LevelManager();
     private progressBar!: Phaser.GameObjects.Graphics;
     private targetScore: number = 0;
+    private lastProgressPct: number = -1;
 
     constructor() {
         super({ key: 'GameScene' });
@@ -97,6 +98,28 @@ export class GameScene extends Phaser.Scene {
 
         // Update UI
         this.updateUI();
+
+        // Start single idle animation timer instead of 54 per-item timers
+        this.startIdleTimer();
+    }
+
+    private startIdleTimer() {
+        this.time.addEvent({
+            delay: 4000,
+            loop: true,
+            callback: () => {
+                // Pick 2-3 random items to animate
+                const count = Phaser.Math.Between(2, 3);
+                for (let i = 0; i < count; i++) {
+                    const row = Phaser.Math.Between(0, GRID_ROWS - 1);
+                    const col = Phaser.Math.Between(0, GRID_COLS - 1);
+                    const item = this.grid[row][col];
+                    if (item) {
+                        item.animateIdleJump();
+                    }
+                }
+            }
+        });
     }
 
     private createUI() {
@@ -768,11 +791,17 @@ export class GameScene extends Phaser.Scene {
     }
 
     private drawProgressBar() {
+        const progress = Math.min(this.score / this.targetScore, 1);
+        const progressPct = Math.floor(progress * 100);
+
+        // Skip redraw if progress hasn't changed significantly (perf)
+        if (progressPct === this.lastProgressPct) return;
+        this.lastProgressPct = progressPct;
+
         const barX = 70;
         const barY = 170;
         const barW = 580;
         const barH = 12;
-        const progress = Math.min(this.score / this.targetScore, 1);
 
         this.progressBar.clear();
         // Background
@@ -821,6 +850,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     private emitParticles(x: number, y: number, foodType: string) {
+        // Throttle: skip if too many particles active
+        if (this.tweens.getTweens().length > 80) return;
+
         const colors: Record<string, number> = {
             manti: 0xffffff,
             belyash: 0xffcc00,
@@ -831,7 +863,7 @@ export class GameScene extends Phaser.Scene {
         };
         const color = colors[foodType] || 0xffffff;
 
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 4; i++) {
             const particle = this.add.circle(x, y, Phaser.Math.Between(2, 5), color, 0.8)
                 .setDepth(49);
 

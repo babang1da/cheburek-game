@@ -23,6 +23,9 @@ body {
   font-family: 'Arial', sans-serif;
   overflow: hidden;
   touch-action: none;
+
+  /* Perf: prevent background repaint when canvas updates */
+  contain: layout style paint;
 }
 
 #app {
@@ -36,4 +39,6 @@ body {
 canvas {
   display: block;
   touch-action: none;
+  /* Perf: promote canvas to GPU layer — prevents drag stutter */
+  will-change: transform;
 }

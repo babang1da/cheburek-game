@@ -35,37 +35,19 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
 
         // Add shadow effect (Phaser 3.60+)
         if (this.postFX) {
-            // x=6, y=6 (offset to bottom-right), decay=0.1, intensity=0.1 (extremely subtle)
             this.postFX.addShadow(-2, 2, 0.1, 1, 0x000000, 10, 0.1);
         }
 
         // Make interactive
         this.setInteractive();
 
-        // Start random idle animation
-        this.startIdleAnimation();
-
         scene.add.existing(this);
     }
 
-    private startIdleAnimation() {
-        // Random start delay between 2 and 10 seconds
-        this.scene.time.addEvent({
-            delay: Phaser.Math.Between(2000, 10000),
-            callback: () => {
-                if (!this.scene) return; // Check if still alive
-
-                // Only jump animation
-                this.animateJump();
-
-                // Schedule next animation
-                this.startIdleAnimation();
-            }
-        });
-    }
-
-    private animateJump() {
-        if (this.isMoving || !this.scene) return;
+    // Idle animation is now driven by a single scene-level timer in GameScene
+    // (see GameScene.startIdleTimer). This method is called externally.
+    animateIdleJump() {
+        if (this.isMoving) return;
 
         const startY = this.y;
         const startScaleX = this.scaleX;
@@ -80,8 +62,8 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
             yoyo: true,
             ease: 'Quad.Out',
             onComplete: () => {
-                this.y = startY; // Ensure return to exact position
-                this.setScale(startScaleX, startScaleY); // Restore exact original scale
+                this.y = startY;
+                this.setScale(startScaleX, startScaleY);
             }
         });
     }
@@ -143,6 +125,9 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
 
         // Bring to top when selected
         this.setDepth(selected ? 2 : 1);
+
+        // Kill any existing scale tweens to prevent tween pile-up
+        this.scene.tweens.killTweensOf(this);
 
         this.scene.tweens.add({
             targets: this,
