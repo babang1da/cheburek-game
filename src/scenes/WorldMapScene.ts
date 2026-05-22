@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { LevelManager } from '../utils/LevelManager';
+import { LEVELS } from '../utils/LevelManager';
 
 export class WorldMapScene extends Phaser.Scene {
     private levelManager: LevelManager;
@@ -65,7 +66,7 @@ export class WorldMapScene extends Phaser.Scene {
 
             const isUnlocked = i <= this.levelManager.getMaxUnlockedLevel();
             const stars = this.levelManager.getStars(i);
-            const config = this.levelManager.getConfig();
+            const config = LEVELS[i - 1]; // Get correct config for this level
 
             // Node circle
             const color = isUnlocked ? 0xff6b35 : 0x666666;

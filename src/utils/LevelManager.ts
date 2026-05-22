@@ -5,7 +5,7 @@ export interface LevelConfig {
     name: string;
 }
 
-const LEVELS: LevelConfig[] = [
+export const LEVELS: LevelConfig[] = [
     { level: 1, targetScore: 1000, moves: 30, name: 'Новичок' },
     { level: 2, targetScore: 2000, moves: 28, name: 'Любитель' },
     { level: 3, targetScore: 3500, moves: 26, name: 'Гурман' },
@@ -36,6 +36,11 @@ export class LevelManager {
             this.currentLevel++;
             this.saveLevel();
         }
+    }
+
+    setLevel(level: number) {
+        this.currentLevel = Math.max(1, Math.min(level, LEVELS.length));
+        this.saveLevel();
     }
 
     resetLevel() {

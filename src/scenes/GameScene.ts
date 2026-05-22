@@ -58,6 +58,13 @@ export class GameScene extends Phaser.Scene {
         // Generate textures for items that might be missing assets
         this.generateTextures();
 
+        // Check if a level was selected from World Map
+        const selectedLevel = this.registry.get('selectedLevel');
+        if (selectedLevel && typeof selectedLevel === 'number') {
+            this.levelManager.setLevel(selectedLevel);
+            this.registry.remove('selectedLevel'); // Clean up
+        }
+
         // Dynamic gradient background (no image overhead)
         const bg = this.add.graphics();
         bg.fillGradientStyle(0x1a0a2e, 0x1a0a2e, 0x4a2a5e, 0x4a2a5e, 1);
