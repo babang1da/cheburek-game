@@ -44,10 +44,18 @@ export class GameScene extends Phaser.Scene {
     private lastProgressPct: number = -1;
     
     // Boosters
-    private boosterLightBall: number = 0;
-    private boosterBomb: number = 0;
-    private boosterDisco: number = 0;
+    private boosterLightBall: number = 1;
+    private boosterBomb: number = 1;
+    private boosterDisco: number = 1;
     private activeBooster: string | null = null;
+
+    // Booster button text references for UI updates
+    private boosterLightBallText!: Phaser.GameObjects.Text;
+    private boosterBombText!: Phaser.GameObjects.Text;
+    private boosterDiscoText!: Phaser.GameObjects.Text;
+
+    // Original booster button styles for visual feedback restoration
+    private boosterOrigColors: Record<string, string> = {};
 
     constructor() {
         super({ key: 'GameScene' });
@@ -352,8 +360,10 @@ export class GameScene extends Phaser.Scene {
         const spacing = 120;
         const startX = 360 - spacing;
 
+        const boosterCost = 50; // Coins to buy one booster
+
         // Booster: Light Ball
-        const lightBallBtn = this.add.text(startX, panelY, `⚡ ${this.boosterLightBall}`, {
+        this.boosterLightBallText = this.add.text(startX, panelY, `⚡ ${this.boosterLightBall}`, {
             fontSize: '28px',
             fontFamily: 'Arial',
             color: '#ffffff',
@@ -361,15 +371,18 @@ export class GameScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-        lightBallBtn.on('pointerdown', () => {
+        this.boosterLightBallText.on('pointerdown', () => {
             if (this.boosterLightBall > 0) {
                 this.boosterLightBall--;
                 this.activateBooster('lightball');
+                this.updateBoosterTexts();
+            } else {
+                this.purchaseBooster('lightball', boosterCost);
             }
         });
 
         // Booster: Bomb
-        const bombBtn = this.add.text(startX + spacing, panelY, `💣 ${this.boosterBomb}`, {
+        this.boosterBombText = this.add.text(startX + spacing, panelY, `💣 ${this.boosterBomb}`, {
             fontSize: '28px',
             fontFamily: 'Arial',
             color: '#ffffff',
@@ -377,15 +390,18 @@ export class GameScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-        bombBtn.on('pointerdown', () => {
+        this.boosterBombText.on('pointerdown', () => {
             if (this.boosterBomb > 0) {
                 this.boosterBomb--;
                 this.activateBooster('bomb');
+                this.updateBoosterTexts();
+            } else {
+                this.purchaseBooster('bomb', boosterCost);
             }
         });
 
         // Booster: Disco Ball
-        const discoBtn = this.add.text(startX + spacing * 2, panelY, `🌈 ${this.boosterDisco}`, {
+        this.boosterDiscoText = this.add.text(startX + spacing * 2, panelY, `🌈 ${this.boosterDisco}`, {
             fontSize: '28px',
             fontFamily: 'Arial',
             color: '#ffffff',
@@ -393,24 +409,51 @@ export class GameScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-        discoBtn.on('pointerdown', () => {
+        this.boosterDiscoText.on('pointerdown', () => {
             if (this.boosterDisco > 0) {
                 this.boosterDisco--;
                 this.activateBooster('disco');
+                this.updateBoosterTexts();
+            } else {
+                this.purchaseBooster('disco', boosterCost);
             }
         });
+
+        // Store original styles for visual feedback restoration
+        this.boosterOrigColors['lightball'] = '#ffffff';
+        this.boosterOrigColors['bomb'] = '#ffffff';
+        this.boosterOrigColors['disco'] = '#ffffff';
     }
 
     private activateBooster(type: 'lightball' | 'bomb' | 'disco') {
         // Set active booster - next swap will trigger the effect
         this.activeBooster = type;
         soundManager.playClick();
+
+        // Visual feedback: highlight the active booster button
+        const btn = this.getBoosterText(type);
+        if (btn) {
+            this.boosterOrigColors[type] = btn.style.color as string;
+            btn.setColor('#ffff00');
+            this.tweens.add({
+                targets: btn,
+                scaleX: 1.2,
+                scaleY: 1.2,
+                duration: 200,
+                yoyo: true,
+                ease: 'Sine.easeInOut'
+            });
+        }
+
         console.log(`Active booster: ${type} - next swap will trigger effect`);
     }
 
     private applyBoosterEffect(type: string, item: FoodItem) {
         const row = item.gridRow;
         const col = item.gridCol;
+        
+        // Play booster activation sound
+        soundManager.playDestroy();
         
         if (type === 'bomb') {
             // Destroy 3x3 area
@@ -447,6 +490,94 @@ export class GameScene extends Phaser.Scene {
         this.dropItems();
         this.fillEmptySpaces();
         soundManager.playDestroy();
+
+        // Reset booster button visual
+        this.resetBoosterStyles();
+    }
+
+    private getBoosterText(type: string): Phaser.GameObjects.Text | null {
+        switch (type) {
+            case 'lightball': return this.boosterLightBallText;
+            case 'bomb': return this.boosterBombText;
+            case 'disco': return this.boosterDiscoText;
+            default: return null;
+        }
+    }
+
+    private updateBoosterTexts() {
+        this.boosterLightBallText.setText(`⚡ ${this.boosterLightBall}`);
+        this.boosterBombText.setText(`💣 ${this.boosterBomb}`);
+        this.boosterDiscoText.setText(`🌈 ${this.boosterDisco}`);
+    }
+
+    private resetBoosterStyles() {
+        const resetBtn = (btn: Phaser.GameObjects.Text, origColor: string) => {
+            if (btn) {
+                btn.setColor(origColor);
+                btn.setScale(1);
+            }
+        };
+        resetBtn(this.boosterLightBallText, this.boosterOrigColors['lightball'] || '#ffffff');
+        resetBtn(this.boosterBombText, this.boosterOrigColors['bomb'] || '#ffffff');
+        resetBtn(this.boosterDiscoText, this.boosterOrigColors['disco'] || '#ffffff');
+    }
+
+    private purchaseBooster(type: 'lightball' | 'bomb' | 'disco', cost: number) {
+        if (this.levelManager.spendCoins(cost)) {
+            // Grant booster
+            switch (type) {
+                case 'lightball': this.boosterLightBall++; break;
+                case 'bomb': this.boosterBomb++; break;
+                case 'disco': this.boosterDisco++; break;
+            }
+            this.updateBoosterTexts();
+            this.updateCoinsDisplay();
+            soundManager.playClick();
+
+            // Show purchase feedback text
+            const btn = this.getBoosterText(type);
+            if (btn) {
+                const feedback = this.add.text(btn.x, btn.y - 30, '+1', {
+                    fontSize: '24px',
+                    fontFamily: 'Arial',
+                    color: '#00ff88',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                }).setOrigin(0.5).setDepth(100);
+
+                this.tweens.add({
+                    targets: feedback,
+                    y: feedback.y - 30,
+                    alpha: 0,
+                    duration: 800,
+                    ease: 'Power2',
+                    onComplete: () => feedback.destroy()
+                });
+            }
+        } else {
+            // Not enough coins — show feedback
+            const btn = this.getBoosterText(type);
+            if (btn) {
+                const feedback = this.add.text(btn.x, btn.y - 30, 'Нет монет', {
+                    fontSize: '18px',
+                    fontFamily: 'Arial',
+                    color: '#ff4444',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                }).setOrigin(0.5).setDepth(100);
+
+                this.tweens.add({
+                    targets: feedback,
+                    y: feedback.y - 30,
+                    alpha: 0,
+                    duration: 1000,
+                    ease: 'Power2',
+                    onComplete: () => feedback.destroy()
+                });
+            }
+        }
     }
 
     private destroyItem(item: FoodItem) {
@@ -1032,6 +1163,11 @@ export class GameScene extends Phaser.Scene {
         this.scoreText.setText(`Счёт: ${this.score}`);
         this.movesText.setText(`Ходы: ${this.movesRemaining}`);
         this.drawProgressBar();
+    }
+
+    private updateCoinsDisplay() {
+        const coins = this.levelManager.getCoins();
+        this.coinsText.setText(`🪙 ${coins}`);
     }
 
     private drawProgressBar() {

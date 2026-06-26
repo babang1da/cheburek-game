@@ -113,6 +113,16 @@ export class LevelManager {
         } catch { /* ignore */ }
     }
 
+    // Spend coins — returns true if successful, false if insufficient
+    spendCoins(amount: number): boolean {
+        const current = this.getCoins();
+        if (current < amount) return false;
+        try {
+            localStorage.setItem('samsa_swap_coins', (current - amount).toString());
+        } catch { /* ignore */ }
+        return true;
+    }
+
     // Earn coins on level completion (100 per star)
     earnLevelCoins(stars: number): number {
         const coins = stars * 100;
