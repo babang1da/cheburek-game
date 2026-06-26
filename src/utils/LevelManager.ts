@@ -6,14 +6,26 @@ export interface LevelConfig {
 }
 
 export const LEVELS: LevelConfig[] = [
-    { level: 1, targetScore: 1000, moves: 30, name: 'Новичок' },
-    { level: 2, targetScore: 2000, moves: 28, name: 'Любитель' },
-    { level: 3, targetScore: 3500, moves: 26, name: 'Гурман' },
-    { level: 4, targetScore: 5000, moves: 25, name: 'Повар' },
-    { level: 5, targetScore: 7000, moves: 24, name: 'Шеф-повар' },
-    { level: 6, targetScore: 10000, moves: 22, name: 'Мастер кухни' },
-    { level: 7, targetScore: 14000, moves: 20, name: 'Ресторатор' },
-    { level: 8, targetScore: 19000, moves: 18, name: 'Легенда' },
+    { level: 1, targetScore: 1950, moves: 30, name: 'Новичок' },
+    { level: 2, targetScore: 1960, moves: 28, name: 'Любитель' },
+    { level: 3, targetScore: 1980, moves: 26, name: 'Гурман' },
+    { level: 4, targetScore: 2000, moves: 25, name: 'Повар' },
+    { level: 5, targetScore: 2040, moves: 24, name: 'Шеф-повар' },
+    { level: 6, targetScore: 1980, moves: 22, name: 'Мастер кухни' },
+    { level: 7, targetScore: 2100, moves: 20, name: 'Ресторатор' },
+    { level: 8, targetScore: 2340, moves: 18, name: 'Легенда' },
+    { level: 9, targetScore: 2450, moves: 17, name: 'Восточный кулинар' },
+    { level: 10, targetScore: 2560, moves: 16, name: 'Ханский повар' },
+    { level: 11, targetScore: 2750, moves: 16, name: 'Знаток вкуса' },
+    { level: 12, targetScore: 3000, moves: 15, name: 'Шёлковый путь' },
+    { level: 13, targetScore: 3250, moves: 15, name: 'Кочевник' },
+    { level: 14, targetScore: 3640, moves: 14, name: 'Караван-баши' },
+    { level: 15, targetScore: 4050, moves: 14, name: 'Великий шеф' },
+    { level: 16, targetScore: 4550, moves: 13, name: 'Золотой котёл' },
+    { level: 17, targetScore: 5200, moves: 13, name: 'Падишах' },
+    { level: 18, targetScore: 6000, moves: 12, name: 'Властелин кухни' },
+    { level: 19, targetScore: 7000, moves: 12, name: 'Мифический кулинар' },
+    { level: 20, targetScore: 7500, moves: 15, name: 'Легенда Востока' },
 ];
 
 export class LevelManager {
@@ -128,6 +140,62 @@ export class LevelManager {
         const coins = stars * 100;
         this.addCoins(coins);
         return coins;
+    }
+
+    // Booster persistence
+    getBoosters(): { lightball: number; bomb: number; disco: number } {
+        try {
+            const saved = localStorage.getItem('samsa_swap_boosters');
+            if (saved) {
+                const data = JSON.parse(saved);
+                return {
+                    lightball: Math.max(0, Math.floor(data.lightball || 0)),
+                    bomb: Math.max(0, Math.floor(data.bomb || 0)),
+                    disco: Math.max(0, Math.floor(data.disco || 0)),
+                };
+            }
+        } catch { /* ignore */ }
+        return { lightball: 0, bomb: 0, disco: 0 };
+    }
+
+    saveBoosters(boosters: { lightball: number; bomb: number; disco: number }) {
+        try {
+            localStorage.setItem('samsa_swap_boosters', JSON.stringify({
+                lightball: Math.max(0, Math.floor(boosters.lightball)),
+                bomb: Math.max(0, Math.floor(boosters.bomb)),
+                disco: Math.max(0, Math.floor(boosters.disco)),
+            }));
+        } catch { /* ignore */ }
+    }
+
+    addBooster(type: 'lightball' | 'bomb' | 'disco', count: number = 1) {
+        const boosters = this.getBoosters();
+        boosters[type] += count;
+        this.saveBoosters(boosters);
+    }
+
+    spendBooster(type: 'lightball' | 'bomb' | 'disco'): boolean {
+        const boosters = this.getBoosters();
+        if (boosters[type] <= 0) return false;
+        boosters[type]--;
+        this.saveBoosters(boosters);
+        return true;
+    }
+
+    // Daily reward — returns true if a new day's reward was just claimed
+    checkDailyReward(): boolean {
+        try {
+            const lastDaily = localStorage.getItem('samsa_swap_last_daily');
+            const today = new Date().toDateString(); // e.g. "Fri Jun 26 2026"
+            if (lastDaily === today) {
+                return false; // Already claimed today
+            }
+            // New day — give reward
+            localStorage.setItem('samsa_swap_last_daily', today);
+            this.addCoins(100);
+            return true;
+        } catch { /* ignore */ }
+        return false;
     }
 
     private loadLevel(): number {

@@ -43,10 +43,10 @@ export class GameScene extends Phaser.Scene {
     private targetScore: number = 0;
     private lastProgressPct: number = -1;
     
-    // Boosters
-    private boosterLightBall: number = 1;
-    private boosterBomb: number = 1;
-    private boosterDisco: number = 1;
+    // Boosters — loaded from LevelManager persistence
+    private boosterLightBall: number = 0;
+    private boosterBomb: number = 0;
+    private boosterDisco: number = 0;
     private activeBooster: string | null = null;
 
     // Booster button text references for UI updates
@@ -56,6 +56,12 @@ export class GameScene extends Phaser.Scene {
 
     // Original booster button styles for visual feedback restoration
     private boosterOrigColors: Record<string, string> = {};
+
+    // Pause menu
+    private isPaused: boolean = false;
+    private pauseOverlay!: Phaser.GameObjects.Container;
+    private pauseBtn!: Phaser.GameObjects.Text;
+    private idleTimer: Phaser.Time.TimerEvent | null = null;
 
     constructor() {
         super({ key: 'GameScene' });
@@ -91,6 +97,12 @@ export class GameScene extends Phaser.Scene {
 
         // Load best score
         this.bestScore = parseInt(localStorage.getItem('samsa_swap_best_score') || '0', 10);
+
+        // Load boosters from LevelManager persistence
+        const boosters = this.levelManager.getBoosters();
+        this.boosterLightBall = boosters.lightball;
+        this.boosterBomb = boosters.bomb;
+        this.boosterDisco = boosters.disco;
 
         // Create UI
         this.createUI();
@@ -142,6 +154,13 @@ export class GameScene extends Phaser.Scene {
                 }
             }
         });
+
+        // Escape key for pause
+        this.input.keyboard!.on('keydown-ESC', () => {
+            if (!this.gameOverPanel.visible) {
+                this.togglePause();
+            }
+        });
     }
 
     update() {
@@ -152,7 +171,7 @@ export class GameScene extends Phaser.Scene {
     // Removed update() — FPS text now updated via timer every 500ms
 
     private startIdleTimer() {
-        this.time.addEvent({
+        this.idleTimer = this.time.addEvent({
             delay: 2500,
             loop: true,
             callback: () => {
@@ -257,6 +276,21 @@ export class GameScene extends Phaser.Scene {
 
         this.soundBtn.on('pointerover', () => this.soundBtn.setScale(1.2));
         this.soundBtn.on('pointerout', () => this.soundBtn.setScale(1));
+
+        // Pause button - top right corner, left of sound button
+        this.pauseBtn = this.add.text(660, 30, '⏸', {
+            fontSize: '28px',
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        this.pauseBtn.on('pointerdown', () => {
+            this.togglePause();
+        });
+
+        this.pauseBtn.on('pointerover', () => this.pauseBtn.setScale(1.2));
+        this.pauseBtn.on('pointerout', () => this.pauseBtn.setScale(1));
+
+        // Create pause menu overlay (hidden initially)
+        this.createPauseMenu();
 
         // Progress bar - centered below title/level
         this.progressBar = this.add.graphics();
@@ -405,6 +439,133 @@ export class GameScene extends Phaser.Scene {
         this.gameOverPanel.setData('coinText', coinText);
     }
 
+    private createPauseMenu() {
+        // Semi-transparent overlay
+        const bg = this.add.rectangle(360, 540, 720, 1080, 0x000000, 0.7);
+        bg.setInteractive(); // Block clicks behind
+
+        // Panel background
+        const panelBg = this.add.rectangle(360, 460, 400, 320, 0x1a1a2e, 0.95)
+            .setStrokeStyle(4, 0xffcc00);
+
+        // Title
+        const title = this.add.text(360, 320, 'ПАУЗА', {
+            fontSize: '42px',
+            fontFamily: 'Arial',
+            color: '#ffcc00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4,
+        }).setOrigin(0.5);
+
+        // Resume button
+        const resumeBg = this.add.graphics();
+        const resumeBgW = 200;
+        const resumeBgH = 54;
+        const resumeBgX = 360 - resumeBgW / 2;
+        const resumeBgY = 390;
+        resumeBg.fillStyle(0x00aa55, 1);
+        resumeBg.fillRoundedRect(resumeBgX, resumeBgY, resumeBgW, resumeBgH, 16);
+        resumeBg.lineStyle(2, 0x00ff88, 1);
+        resumeBg.strokeRoundedRect(resumeBgX, resumeBgY, resumeBgW, resumeBgH, 16);
+
+        const resumeBtn = this.add.text(360, resumeBgY + resumeBgH / 2, '▶ ПРОДОЛЖИТЬ', {
+            fontSize: '22px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            fontStyle: 'bold',
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        resumeBtn.on('pointerdown', () => this.togglePause());
+        resumeBtn.on('pointerover', () => { resumeBg.clear(); resumeBg.fillStyle(0x00cc66, 1); resumeBg.fillRoundedRect(resumeBgX - 4, resumeBgY - 4, resumeBgW + 8, resumeBgH + 8, 18); resumeBg.lineStyle(3, 0x00ff88, 1); resumeBg.strokeRoundedRect(resumeBgX - 4, resumeBgY - 4, resumeBgW + 8, resumeBgH + 8, 18); resumeBtn.setScale(1.05); });
+        resumeBtn.on('pointerout', () => { resumeBg.clear(); resumeBg.fillStyle(0x00aa55, 1); resumeBg.fillRoundedRect(resumeBgX, resumeBgY, resumeBgW, resumeBgH, 16); resumeBg.lineStyle(2, 0x00ff88, 1); resumeBg.strokeRoundedRect(resumeBgX, resumeBgY, resumeBgW, resumeBgH, 16); resumeBtn.setScale(1); });
+
+        // Restart button
+        const restartBg = this.add.graphics();
+        const restartBg2X = 360 - resumeBgW / 2;
+        const restartBg2Y = 460;
+        restartBg.fillStyle(0x555555, 1);
+        restartBg.fillRoundedRect(restartBg2X, restartBg2Y, resumeBgW, resumeBgH, 16);
+        restartBg.lineStyle(2, 0xffcc00, 1);
+        restartBg.strokeRoundedRect(restartBg2X, restartBg2Y, resumeBgW, resumeBgH, 16);
+
+        const restartBtn2 = this.add.text(360, restartBg2Y + resumeBgH / 2, '↺ ЗАНОВО', {
+            fontSize: '22px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            fontStyle: 'bold',
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        restartBtn2.on('pointerdown', () => {
+            this.isPaused = false;
+            this.scene.restart();
+        });
+        restartBtn2.on('pointerover', () => { restartBg.clear(); restartBg.fillStyle(0x777777, 1); restartBg.fillRoundedRect(restartBg2X - 4, restartBg2Y - 4, resumeBgW + 8, resumeBgH + 8, 18); restartBg.lineStyle(3, 0xffcc00, 1); restartBg.strokeRoundedRect(restartBg2X - 4, restartBg2Y - 4, resumeBgW + 8, resumeBgH + 8, 18); restartBtn2.setScale(1.05); });
+        restartBtn2.on('pointerout', () => { restartBg.clear(); restartBg.fillStyle(0x555555, 1); restartBg.fillRoundedRect(restartBg2X, restartBg2Y, resumeBgW, resumeBgH, 16); restartBg.lineStyle(2, 0xffcc00, 1); restartBg.strokeRoundedRect(restartBg2X, restartBg2Y, resumeBgW, resumeBgH, 16); restartBtn2.setScale(1); });
+
+        // Map button
+        const mapBg = this.add.graphics();
+        const mapBg3X = 360 - resumeBgW / 2;
+        const mapBg3Y = 530;
+        mapBg.fillStyle(0xaa4444, 1);
+        mapBg.fillRoundedRect(mapBg3X, mapBg3Y, resumeBgW, resumeBgH, 16);
+        mapBg.lineStyle(2, 0xff6666, 1);
+        mapBg.strokeRoundedRect(mapBg3X, mapBg3Y, resumeBgW, resumeBgH, 16);
+
+        const mapBtn2 = this.add.text(360, mapBg3Y + resumeBgH / 2, '🗺 НА КАРТУ', {
+            fontSize: '22px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            fontStyle: 'bold',
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        mapBtn2.on('pointerdown', () => {
+            this.isPaused = false;
+            this.scene.start('WorldMapScene');
+        });
+        mapBtn2.on('pointerover', () => { mapBg.clear(); mapBg.fillStyle(0xcc5555, 1); mapBg.fillRoundedRect(mapBg3X - 4, mapBg3Y - 4, resumeBgW + 8, resumeBgH + 8, 18); mapBg.lineStyle(3, 0xff6666, 1); mapBg.strokeRoundedRect(mapBg3X - 4, mapBg3Y - 4, resumeBgW + 8, resumeBgH + 8, 18); mapBtn2.setScale(1.05); });
+        mapBtn2.on('pointerout', () => { mapBg.clear(); mapBg.fillStyle(0xaa4444, 1); mapBg.fillRoundedRect(mapBg3X, mapBg3Y, resumeBgW, resumeBgH, 16); mapBg.lineStyle(2, 0xff6666, 1); mapBg.strokeRoundedRect(mapBg3X, mapBg3Y, resumeBgW, resumeBgH, 16); mapBtn2.setScale(1); });
+
+        this.pauseOverlay = this.add.container(0, 0, [bg, panelBg, title, resumeBg, resumeBtn, restartBg, restartBtn2, mapBg, mapBtn2]);
+        this.pauseOverlay.setDepth(200);
+        this.pauseOverlay.setVisible(false);
+    }
+
+    private togglePause() {
+        this.isPaused = !this.isPaused;
+        if (this.isPaused) {
+            // Pause timers
+            if (this.hintTimer) this.hintTimer.paused = true;
+            if (this.idleTimer) this.idleTimer.paused = true;
+
+            // Pause all tweens
+            this.tweens.pauseAll();
+
+            // Disable input
+            this.input.enabled = false;
+
+            // Show overlay
+            this.pauseOverlay.setVisible(true);
+
+            soundManager.playClick();
+        } else {
+            // Resume timers
+            if (this.hintTimer) this.hintTimer.paused = false;
+            if (this.idleTimer) this.idleTimer.paused = false;
+
+            // Resume tweens
+            this.tweens.resumeAll();
+
+            // Enable input
+            this.input.enabled = true;
+
+            // Hide overlay
+            this.pauseOverlay.setVisible(false);
+
+            soundManager.playClick();
+        }
+    }
+
     private createBoostersPanel() {
         const panelY = 1020;
         const spacing = 120;
@@ -439,6 +600,7 @@ export class GameScene extends Phaser.Scene {
         this.boosterLightBallText.on('pointerdown', () => {
             if (this.boosterLightBall > 0) {
                 this.boosterLightBall--;
+                this.levelManager.spendBooster('lightball');
                 this.activateBooster('lightball');
                 this.updateBoosterTexts();
             } else {
@@ -458,6 +620,7 @@ export class GameScene extends Phaser.Scene {
         this.boosterBombText.on('pointerdown', () => {
             if (this.boosterBomb > 0) {
                 this.boosterBomb--;
+                this.levelManager.spendBooster('bomb');
                 this.activateBooster('bomb');
                 this.updateBoosterTexts();
             } else {
@@ -477,6 +640,7 @@ export class GameScene extends Phaser.Scene {
         this.boosterDiscoText.on('pointerdown', () => {
             if (this.boosterDisco > 0) {
                 this.boosterDisco--;
+                this.levelManager.spendBooster('disco');
                 this.activateBooster('disco');
                 this.updateBoosterTexts();
             } else {
@@ -597,18 +761,48 @@ export class GameScene extends Phaser.Scene {
 
     private purchaseBooster(type: 'lightball' | 'bomb' | 'disco', cost: number) {
         if (this.levelManager.spendCoins(cost)) {
-            // Grant booster
-            switch (type) {
-                case 'lightball': this.boosterLightBall++; break;
-                case 'bomb': this.boosterBomb++; break;
-                case 'disco': this.boosterDisco++; break;
-            }
+            // Grant booster via LevelManager
+            this.levelManager.addBooster(type);
+            // Reload boosters into local variables
+            const boosters = this.levelManager.getBoosters();
+            this.boosterLightBall = boosters.lightball;
+            this.boosterBomb = boosters.bomb;
+            this.boosterDisco = boosters.disco;
+
             this.updateBoosterTexts();
             this.updateCoinsDisplay();
             soundManager.playClick();
 
-            // Show purchase feedback text
+            // Coin animation: circles from coinsText to booster button
+            const startX = this.coinsText.x;
+            const startY = this.coinsText.y;
             const btn = this.getBoosterText(type);
+            if (btn) {
+                const endX = btn.x;
+                const endY = btn.y;
+                // Create 5 flying coin particles
+                for (let i = 0; i < 5; i++) {
+                    const coin = this.add.text(startX, startY, '🪙', {
+                        fontSize: '16px',
+                    }).setOrigin(0.5).setDepth(150).setAlpha(0.8);
+
+                    const delay = i * 60;
+                    this.tweens.add({
+                        targets: coin,
+                        x: endX + Phaser.Math.Between(-15, 15),
+                        y: endY + Phaser.Math.Between(-15, 15),
+                        scaleX: 0.5,
+                        scaleY: 0.5,
+                        alpha: 0,
+                        duration: 500,
+                        delay: delay,
+                        ease: 'Power1',
+                        onComplete: () => coin.destroy()
+                    });
+                }
+            }
+
+            // Show purchase feedback text
             if (btn) {
                 const feedback = this.add.text(btn.x, btn.y - 30, '+1', {
                     fontSize: '24px',

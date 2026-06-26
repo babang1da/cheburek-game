@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FOOD_TYPES } from '../utils/constants';
 import { soundManager } from '../utils/SoundManager';
+import { LevelManager } from '../utils/LevelManager';
 
 export class BootScene extends Phaser.Scene {
     private floatingItems: Phaser.GameObjects.Sprite[] = [];
@@ -153,6 +154,41 @@ export class BootScene extends Phaser.Scene {
             fontFamily: 'Arial',
             color: '#666666',
         }).setOrigin(0.5);
+
+        // Daily reward check — after a short delay so scene loads first
+        this.time.delayedCall(1000, () => {
+            const levelManager = new LevelManager();
+            if (levelManager.checkDailyReward()) {
+                soundManager.playShimmer ? soundManager.playShimmer() : soundManager.playClick();
+                const popup = this.add.text(w / 2, h * 0.55, 'Ежедневная награда!\n+100 🪙', {
+                    fontSize: '28px',
+                    fontFamily: 'Arial',
+                    color: '#ffcc00',
+                    fontStyle: 'bold',
+                    align: 'center',
+                    stroke: '#000000',
+                    strokeThickness: 4,
+                }).setOrigin(0.5).setDepth(200).setScale(0);
+
+                this.tweens.add({
+                    targets: popup,
+                    scale: 1,
+                    duration: 600,
+                    ease: 'Back.easeOut',
+                    onComplete: () => {
+                        this.tweens.add({
+                            targets: popup,
+                            scale: 0,
+                            alpha: 0,
+                            duration: 600,
+                            delay: 900,
+                            ease: 'Power2',
+                            onComplete: () => popup.destroy()
+                        });
+                    }
+                });
+            }
+        });
     }
 
     private createFloatingItems() {
