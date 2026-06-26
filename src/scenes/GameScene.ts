@@ -522,7 +522,7 @@ export class GameScene extends Phaser.Scene {
         console.log(`Active booster: ${type} - next swap will trigger effect`);
     }
 
-    private applyBoosterEffect(type: string, item: FoodItem) {
+    private async applyBoosterEffect(type: string, item: FoodItem) {
         const row = item.gridRow;
         const col = item.gridCol;
         
@@ -565,8 +565,8 @@ export class GameScene extends Phaser.Scene {
             }
         }
         
-        this.dropItems();
-        this.fillEmptySpaces();
+        await this.dropItems();
+        await this.fillEmptySpaces();
         soundManager.playDestroy();
 
         // Reset booster button visual
@@ -839,7 +839,7 @@ export class GameScene extends Phaser.Scene {
 
         // Check for active booster
         if (this.activeBooster) {
-            this.applyBoosterEffect(this.activeBooster, item1);
+            await this.applyBoosterEffect(this.activeBooster, item1);
             this.activeBooster = null;
             this.isProcessing = false;
             return;
