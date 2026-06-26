@@ -10,6 +10,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
     public isTweening: boolean = false;
     public specialType: 'none' | 'bomb' | 'rainbow' | 'row_clear' | 'col_clear' = 'none';
     public shadow: Phaser.GameObjects.Sprite | null = null;
+    public readonly originalScale: number;
     private specialOutline: Phaser.GameObjects.Rectangle | null = null;
 
     constructor(
@@ -32,6 +33,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
         const scaleY = maxSize / this.height;
         const scale = Math.min(scaleX, scaleY); // Use smaller scale to fit
         this.setScale(scale);
+        this.originalScale = scale;
 
         // Ensure item is above grid
         this.setDepth(1);
@@ -79,6 +81,13 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
                 y: targetY,
                 duration: SWAP_DURATION,
                 ease: 'Power2',
+                onUpdate: () => {
+                    if (this.shadow) {
+                        this.shadow.x = this.x;
+                        this.shadow.y = this.y + 4;
+                        this.shadow.setDepth(this.depth - 1);
+                    }
+                },
                 onComplete: () => {
                     this.isMoving = false;
                     resolve();
@@ -97,6 +106,13 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
                 y: targetY,
                 duration: duration,
                 ease: 'Bounce.easeOut',
+                onUpdate: () => {
+                    if (this.shadow) {
+                        this.shadow.x = this.x;
+                        this.shadow.y = this.y + 4;
+                        this.shadow.setDepth(this.depth - 1);
+                    }
+                },
                 onComplete: () => {
                     this.isMoving = false;
                     resolve();
@@ -120,26 +136,6 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
                     resolve();
                 }
             });
-        });
-    }
-
-    animateSelect(selected: boolean): void {
-        const targetScale = selected ? this.scaleX * 1.1 : this.scaleX / 1.1;
-
-        // Bring to top when selected
-        this.setDepth(selected ? 2 : 1);
-
-        // Kill any existing scale tweens to prevent tween pile-up
-        // CRITICAL: also reset isTweening since idle tween's onComplete won't fire
-        this.isTweening = false;
-        this.scene.tweens.killTweensOf(this);
-
-        this.scene.tweens.add({
-            targets: this,
-            scaleX: targetScale,
-            scaleY: targetScale,
-            duration: 100,
-            ease: 'Power2'
         });
     }
 
@@ -232,6 +228,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
         }
 
         // Sync outline position with item
+        this.scene.events.off('update', this.syncSpecialGlow, this);
         this.scene.events.on('update', this.syncSpecialGlow, this);
     }
 
@@ -244,7 +241,8 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
 
     /** Remove all special visual effects and reset tint/alpha */
     clearSpecialVisual() {
-        this.scene.tweens.killTweensOf(this);
+        // Don't killTweensOf(this) — that would break idle/swap/drop animations.
+        // Only clean up special outline and its tweens.
         this.clearTint();
         this.setAlpha(1);
         if (this.specialOutline) {

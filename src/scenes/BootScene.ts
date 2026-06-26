@@ -116,17 +116,14 @@ export class BootScene extends Phaser.Scene {
         });
 
         // Animations
-        // Title slide-in with sound
+        // Title slide-in
         this.tweens.add({
             targets: title,
             alpha: 1,
             y: h * 0.22,
             duration: 800,
             ease: 'Back.easeOut',
-            delay: 200,
-            onStart: () => {
-                soundManager.playMatch(3);
-            }
+            delay: 200
         });
 
         this.tweens.add({

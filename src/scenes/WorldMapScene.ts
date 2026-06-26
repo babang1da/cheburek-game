@@ -196,9 +196,12 @@ export class WorldMapScene extends Phaser.Scene {
     }
 
     private showLevelPreview(node: LevelNode) {
-        // Brief preview - just start the level for now
-        this.registry.set('selectedLevel', node.level);
-        this.scene.start('GameScene');
+        // Fade transition before starting the level
+        this.cameras.main.fadeOut(300, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.registry.set('selectedLevel', node.level);
+            this.scene.start('GameScene');
+        });
     }
 
     private animateCurrentLevel() {

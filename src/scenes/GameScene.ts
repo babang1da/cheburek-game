@@ -145,17 +145,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     update() {
-        // Sync shadow positions with items (cheap operation)
-        for (let row = 0; row < GRID_ROWS; row++) {
-            for (let col = 0; col < GRID_COLS; col++) {
-                const item = this.grid[row][col];
-                if (item && item.shadow) {
-                    item.shadow.x = item.x;
-                    item.shadow.y = item.y + 4;
-                    item.shadow.setDepth(item.depth - 1);
-                }
-            }
-        }
+        // Shadow positions are now synced via tween onUpdate callbacks in FoodItem
+        // (animateSwap and animateDrop), so no per-frame grid loop needed.
     }
 
     // Removed update() — FPS text now updated via timer every 500ms
@@ -535,21 +526,25 @@ export class GameScene extends Phaser.Scene {
             soundManager.playShockwave();
             
             // Destroy 3x3 area
+            const bombPromises: Promise<void>[] = [];
             for (let r = Math.max(0, row - 1); r <= Math.min(GRID_ROWS - 1, row + 1); r++) {
                 for (let c = Math.max(0, col - 1); c <= Math.min(GRID_COLS - 1, col + 1); c++) {
                     const target = this.grid[r][c];
-                    if (target) this.destroyItem(target);
+                    if (target) bombPromises.push(this.destroyItem(target));
                 }
             }
+            await Promise.all(bombPromises);
         } else if (type === 'lightball') {
             // Destroy all of same type
             const targetType = item.foodType;
+            const lightPromises: Promise<void>[] = [];
             for (let r = 0; r < GRID_ROWS; r++) {
                 for (let c = 0; c < GRID_COLS; c++) {
                     const target = this.grid[r][c];
-                    if (target && target.foodType === targetType) this.destroyItem(target);
+                    if (target && target.foodType === targetType) lightPromises.push(this.destroyItem(target));
                 }
             }
+            await Promise.all(lightPromises);
         } else if (type === 'disco') {
             // Change all of one type to another
             const targetType = item.foodType;
@@ -658,9 +653,13 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
-    private destroyItem(item: FoodItem) {
-        item.destroy();
-        this.grid[item.gridRow][item.gridCol] = null;
+    private async destroyItem(item: FoodItem) {
+        // Clear grid reference before animation (animateDestroy will call destroy())
+        const r = item.gridRow, c = item.gridCol;
+        if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS && this.grid[r][c] === item) {
+            this.grid[r][c] = null;
+        }
+        await item.animateDestroy();
     }
 
     private initGrid() {
@@ -724,6 +723,12 @@ export class GameScene extends Phaser.Scene {
             // Direct position update — fast, no tween overhead
             item.x = dragX;
             item.y = dragY;
+            // Sync shadow during drag
+            if (item.shadow) {
+                item.shadow.x = item.x;
+                item.shadow.y = item.y + 4;
+                item.shadow.setDepth(item.depth - 1);
+            }
         });
 
         item.on('dragend', (pointer: Phaser.Input.Pointer) => {
@@ -836,6 +841,10 @@ export class GameScene extends Phaser.Scene {
 
     private async trySwap(item1: FoodItem, item2: FoodItem) {
         this.isProcessing = true;
+
+        // Clear any lingering highlight on both items
+        this.clearHighlight(item1);
+        this.clearHighlight(item2);
 
         // Check for active booster
         if (this.activeBooster) {
@@ -993,15 +1002,7 @@ export class GameScene extends Phaser.Scene {
                     toDestroy.push(item);
                     this.grid[pos.row][pos.col] = null;
 
-                    // Score popup at match position
-                    const points = POINTS_PER_GEM * this.comboLevel;
-                    this.showScorePopup(
-                        GRID_OFFSET_X + pos.col * CELL_SIZE,
-                        GRID_OFFSET_Y + pos.row * CELL_SIZE,
-                        points
-                    );
-
-                    // Simple particle burst
+                    // Simple particle burst per item
                     this.emitParticles(
                         GRID_OFFSET_X + pos.col * CELL_SIZE,
                         GRID_OFFSET_Y + pos.row * CELL_SIZE,
@@ -1009,6 +1010,16 @@ export class GameScene extends Phaser.Scene {
                     );
                 }
             });
+
+            // Aggregated score popup — one per match at the center
+            const points = match.positions.length * POINTS_PER_GEM * this.comboLevel;
+            const centerIdx = Math.floor(match.positions.length / 2);
+            const centerPos = match.positions[centerIdx];
+            this.showScorePopup(
+                GRID_OFFSET_X + centerPos.col * CELL_SIZE,
+                GRID_OFFSET_Y + centerPos.row * CELL_SIZE,
+                points
+            );
         });
 
         // Apply special tile effects
@@ -1429,10 +1440,12 @@ export class GameScene extends Phaser.Scene {
         if (glow) {
             (item as any).__glowSprite = glow;
         }
+        // Use originalScale to prevent cumulative scale growth
+        const baseScale = item.originalScale;
         this.tweens.add({
             targets: item,
-            scaleX: item.scaleX * 1.12,
-            scaleY: item.scaleY * 1.12,
+            scaleX: baseScale * 1.12,
+            scaleY: baseScale * 1.12,
             duration: 150,
             yoyo: true,
             repeat: -1,
@@ -1455,10 +1468,8 @@ export class GameScene extends Phaser.Scene {
             item.specialType = item.specialType; // no-op setter
             item.setSpecialVisual();
         }
-        // Reset scale back to normal
-        const maxSize = CELL_SIZE - 10;
-        const normalScale = Math.min(maxSize / item.width, maxSize / item.height);
-        item.setScale(normalScale);
+        // Reset scale back to normal using originalScale
+        item.setScale(item.originalScale);
     }
 
     private emitParticles(x: number, y: number, foodType: string) {
