@@ -105,6 +105,30 @@ export class SoundManager {
             }, i * 40);
         }
     }
+
+    /** Звук молнии — высокие частоты с быстрым спадом */
+    playLightning() {
+        this.playTone(1200, 0.15, 'sawtooth', 0.12);
+        setTimeout(() => this.playTone(800, 0.1, 'sawtooth', 0.08), 60);
+    }
+
+    /** Звук фейерверка — шумовой всплеск */
+    playFirework() {
+        this.playTone(600, 0.2, 'sawtooth', 0.12, true);
+        setTimeout(() => this.playTone(1200, 0.15, 'sawtooth', 0.08, true), 50);
+    }
+
+    /** Звук ударной волны — низкий бас */
+    playShockwave() {
+        this.playTone(80, 0.3, 'sine', 0.18);
+    }
+
+    /** Звук мерцания — быстрый ascend */
+    playShimmer() {
+        setTimeout(() => this.playTone(880, 0.1, 'triangle', 0.06), 0);
+        setTimeout(() => this.playTone(1320, 0.1, 'triangle', 0.06), 100);
+        setTimeout(() => this.playTone(1760, 0.1, 'triangle', 0.06), 200);
+    }
 }
 
 // Global singleton

@@ -86,15 +86,8 @@ export class GameScene extends Phaser.Scene {
         bg.fillRect(0, 0, 720, 1080);
         bg.setDepth(-1);
 
-        // Add subtle pattern dots for visual depth (cheap: 5% opacity)
-        const pattern = this.add.graphics();
-        for (let x = 0; x < 720; x += 40) {
-            for (let y = 0; y < 1080; y += 40) {
-                pattern.fillStyle(0xffffff, 0.05);
-                pattern.fillCircle(x, y, 1);
-            }
-        }
-        pattern.setDepth(-1);
+        // Add decorative shapes on background instead of boring dots
+        this.drawDecorativeBackground();
 
         // Load best score
         this.bestScore = parseInt(localStorage.getItem('samsa_swap_best_score') || '0', 10);
@@ -124,6 +117,9 @@ export class GameScene extends Phaser.Scene {
             }
         }
         graphics.setDepth(0);
+
+        // Draw decorative frame around the grid
+        this.drawGridFrame();
 
         this.fillBoard();
 
@@ -534,6 +530,10 @@ export class GameScene extends Phaser.Scene {
         soundManager.playDestroy();
         
         if (type === 'bomb') {
+            // Shockwave effect at bomb center
+            this.createShockwave(item.x, item.y);
+            soundManager.playShockwave();
+            
             // Destroy 3x3 area
             for (let r = Math.max(0, row - 1); r <= Math.min(GRID_ROWS - 1, row + 1); r++) {
                 for (let c = Math.max(0, col - 1); c <= Math.min(GRID_COLS - 1, col + 1); c++) {
@@ -765,6 +765,7 @@ export class GameScene extends Phaser.Scene {
                 if (targetItem && this.areAdjacent(item, targetItem)) {
                     item.isMoving = false;
                     item.setDepth(1);
+                    this.clearHighlight(item);
                     this.trySwap(item, targetItem);
                     this.selectedItem = null;
                     return;
@@ -860,10 +861,18 @@ export class GameScene extends Phaser.Scene {
         const x2 = GRID_OFFSET_X + col1 * CELL_SIZE;
         const y2 = GRID_OFFSET_Y + row1 * CELL_SIZE;
 
+        // Create swap trails
+        this.createSwapTrail(item1);
+        this.createSwapTrail(item2);
+
         await Promise.all([
             item1.animateSwap(x1, y1),
             item2.animateSwap(x2, y2)
         ]);
+
+        // Clean up trails after animation
+        this.clearSwapTrail(item1);
+        this.clearSwapTrail(item2);
 
         const matches = this.findMatches();
 
@@ -950,6 +959,17 @@ export class GameScene extends Phaser.Scene {
 
             if (len >= 5) {
                 specialType = 'rainbow';
+                // Chain lightning effect for 5+ matches
+                const matchCenter = {
+                    x: GRID_OFFSET_X + match.positions[Math.floor(len / 2)].col * CELL_SIZE,
+                    y: GRID_OFFSET_Y + match.positions[Math.floor(len / 2)].row * CELL_SIZE,
+                };
+                const lightningTargets = match.positions.map(pos => ({
+                    x: GRID_OFFSET_X + pos.col * CELL_SIZE,
+                    y: GRID_OFFSET_Y + pos.row * CELL_SIZE,
+                }));
+                this.createChainLightning(matchCenter.x, matchCenter.y, lightningTargets);
+                soundManager.playLightning();
             } else if (len === 4) {
                 specialType = 'bomb';
             }
@@ -1017,6 +1037,9 @@ export class GameScene extends Phaser.Scene {
     private activateSpecial(item: FoodItem, row: number, col: number, _matches: MatchResult[], toDestroy: FoodItem[]) {
         switch (item.specialType) {
             case 'bomb':
+                // Shockwave effect
+                this.createShockwave(item.x, item.y);
+                soundManager.playShockwave();
                 // Destroy 3×3 area around the bomb
                 for (let r = row - 1; r <= row + 1; r++) {
                     for (let c = col - 1; c <= col + 1; c++) {
@@ -1253,6 +1276,9 @@ export class GameScene extends Phaser.Scene {
             ease: 'Sine.easeOut'
         });
 
+        // Floating score bubble near top bar
+        this.createScoreBubble(POINTS_PER_GEM);
+
         // Flash moves red when decreasing
         this.movesText.setText(`Ходы: ${this.movesRemaining}`);
         this.tweens.killTweensOf(this.movesText);
@@ -1394,7 +1420,15 @@ export class GameScene extends Phaser.Scene {
     // Highlight methods for selected item
     private highlightSelected(item: FoodItem) {
         this.tweens.killTweensOf(item);
-        item.setTint(0xffff00);
+        // Use glow sprite under item instead of tint
+        const existingGlow = (item as any).__glowSprite as Phaser.GameObjects.Sprite | undefined;
+        if (existingGlow && existingGlow.active) {
+            existingGlow.destroy();
+        }
+        const glow = this.createGlowSprite(item);
+        if (glow) {
+            (item as any).__glowSprite = glow;
+        }
         this.tweens.add({
             targets: item,
             scaleX: item.scaleX * 1.12,
@@ -1408,6 +1442,12 @@ export class GameScene extends Phaser.Scene {
 
     private clearHighlight(item: FoodItem) {
         this.tweens.killTweensOf(item);
+        // Clean up glow sprite
+        const existingGlow = (item as any).__glowSprite as Phaser.GameObjects.Sprite | undefined;
+        if (existingGlow && existingGlow.active) {
+            existingGlow.destroy();
+            (item as any).__glowSprite = undefined;
+        }
         if (item.specialType === 'none') {
             item.clearTint();
         } else {
@@ -1715,36 +1755,13 @@ export class GameScene extends Phaser.Scene {
                     delay: 300 + idx * 200,
                     ease: 'Back.easeOut',
                     onComplete: () => {
-                        // Sparkle effect
-                        this.emitConfetti(360 + x, 480);
+                        // Fireworks instead of simple confetti
+                        this.emitFireworks();
                         soundManager.playMatch(3); // Celebration sound
                     }
                 });
             }
         });
-    }
-
-    private emitConfetti(x: number, y: number) {
-        // Celebration confetti like Royal Match
-        for (let i = 0; i < 8; i++) {
-            const confetti = this.add.circle(x, y, Phaser.Math.Between(3, 6), 
-                Phaser.Display.Color.RandomRGB().color, 0.9)
-                .setDepth(102).setName('particle');
-
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 50 + Math.random() * 80;
-
-            this.tweens.add({
-                targets: confetti,
-                x: x + Math.cos(angle) * speed,
-                y: y + Math.sin(angle) * speed - 50,
-                alpha: 0,
-                scale: 0,
-                duration: 800,
-                ease: 'Power2',
-                onComplete: () => confetti.destroy()
-            });
-        }
     }
 
     private saveBestScore() {
@@ -1753,6 +1770,263 @@ export class GameScene extends Phaser.Scene {
             localStorage.setItem('samsa_swap_best_score', this.bestScore.toString());
         }
     }
+
+    // ── VFX METHODS ──────────────────────────────────────────────
+
+    /** Shockwave: expanding circle at bomb explosion point */
+    private createShockwave(x: number, y: number) {
+        const shockwave = this.add.circle(x, y, 10, 0xff6b35, 0.8)
+            .setStrokeStyle(4, 0xffffff, 1)
+            .setDepth(49);
+
+        this.tweens.add({
+            targets: shockwave,
+            scaleX: 8,
+            scaleY: 8,
+            alpha: 0,
+            duration: 400,
+            ease: 'Sine.easeOut',
+            onComplete: () => shockwave.destroy()
+        });
+    }
+
+    /** Chain lightning: zigzag lines from origin to every destroyed position */
+    private createChainLightning(originX: number, originY: number, targets: { x: number; y: number }[]) {
+        const lightning = this.add.graphics();
+        lightning.setDepth(50);
+        lightning.setAlpha(0.8);
+
+        // Draw zigzag from origin to each target
+        targets.forEach(t => {
+            const steps = 6;
+
+            lightning.lineStyle(2, 0xffff00, 0.8);
+            lightning.beginPath();
+            lightning.moveTo(originX, originY);
+
+            for (let i = 1; i <= steps; i++) {
+                const tween = i / steps;
+                const baseX = originX + (t.x - originX) * tween;
+                const baseY = originY + (t.y - originY) * tween;
+                // Add zigzag offset (perpendicular jitter)
+                const perpX = -(t.y - originY);
+                const perpY = (t.x - originX);
+                const perpLen = Math.sqrt(perpX * perpX + perpY * perpY) || 1;
+                const jitter = (Math.random() - 0.5) * 20 * (1 - tween);
+                lightning.lineTo(
+                    baseX + (perpX / perpLen) * jitter,
+                    baseY + (perpY / perpLen) * jitter
+                );
+            }
+            lightning.lineTo(t.x, t.y);
+            lightning.strokePath();
+        });
+
+        // Fade out and remove
+        this.tweens.add({
+            targets: lightning,
+            alpha: 0,
+            duration: 300,
+            delay: 50,
+            ease: 'Power2',
+            onComplete: () => lightning.destroy()
+        });
+    }
+
+    /** Trail circles behind swapping items */
+    private createSwapTrail(item: FoodItem) {
+        if (this.activeBooster) return; // Don't create trail if booster processing
+
+        const trailColors: Record<string, number> = {
+            manti: 0xffffff,
+            belyash: 0xffcc00,
+            cheburek: 0xff8844,
+            samsa: 0xffaa33,
+            pakhlava: 0xdaa520,
+            borsok: 0xffd700,
+        };
+        const color = trailColors[item.foodType] || 0xffffff;
+        const alphas = [0.4, 0.3, 0.2, 0.1];
+        const sizes = [20, 16, 12, 8];
+
+        const trailParticles: Phaser.GameObjects.Arc[] = [];
+        alphas.forEach((alpha, i) => {
+            const circle = this.add.circle(item.x, item.y, sizes[i], color, alpha)
+                .setDepth(item.depth - 0.5)
+                .setName('trail');
+            trailParticles.push(circle);
+        });
+
+        // Store trails on the item for cleanup
+        (item as any).__trails = trailParticles;
+    }
+
+    /** Clean up swap trails */
+    private clearSwapTrail(item: FoodItem) {
+        const trails: Phaser.GameObjects.Arc[] | undefined = (item as any).__trails;
+        if (trails) {
+            trails.forEach(t => {
+                this.tweens.killTweensOf(t);
+                t.destroy();
+            });
+            (item as any).__trails = undefined;
+        }
+    }
+
+    /** Fireworks: multiple bursts in random screen positions */
+    private emitFireworks() {
+        const numBursts = Phaser.Math.Between(3, 5);
+        const colors = [0xff0000, 0xffff00, 0x00ff00, 0x0088ff, 0xff69b4];
+
+        for (let b = 0; b < numBursts; b++) {
+            const bx = Phaser.Math.Between(100, 620);
+            const by = Phaser.Math.Between(200, 700);
+            const color = colors[b % colors.length];
+
+            this.time.delayedCall(b * 400, () => {
+                const numParticles = Phaser.Math.Between(8, 12);
+                for (let i = 0; i < numParticles; i++) {
+                    const isStar = i % 3 === 0;
+                    let particle: Phaser.GameObjects.Arc | Phaser.GameObjects.Star;
+
+                    if (isStar) {
+                        particle = this.add.star(bx, by, 5, 2, 5, color, 0.9)
+                            .setDepth(102)
+                            .setName('particle')
+                            .setScale(0);
+                    } else {
+                        particle = this.add.circle(bx, by, Phaser.Math.Between(2, 5), color, 0.9)
+                            .setDepth(102)
+                            .setName('particle');
+                    }
+
+                    const angle = (Math.PI * 2 / numParticles) * i + (Math.random() - 0.5) * 0.5;
+                    const speed = 40 + Math.random() * 60;
+
+                    // Gravity tween: arc up then fall
+                    this.tweens.add({
+                        targets: particle,
+                        x: bx + Math.cos(angle) * speed,
+                        y: by + Math.sin(angle) * speed + 80, // gravity pull down
+                        alpha: 0,
+                        scale: isStar ? 1.5 : 0,
+                        duration: 700 + Math.random() * 300,
+                        ease: 'Power2',
+                        onComplete: () => particle.destroy()
+                    });
+                }
+                soundManager.playFirework();
+            });
+        }
+    }
+
+    /** Create a glow sprite under a food item */
+    private createGlowSprite(item: FoodItem): Phaser.GameObjects.Sprite | null {
+        if (!this.textures.exists('food_glow')) return null;
+
+        const glow = this.add.sprite(item.x, item.y, 'food_glow')
+            .setDepth(item.depth - 0.5)
+            .setAlpha(0.5);
+
+        // For special items, tint the glow
+        if (item.specialType !== 'none') {
+            switch (item.specialType) {
+                case 'bomb': glow.setTint(0xff4444); break;
+                case 'rainbow': glow.setTint(0xff00ff); break;
+                case 'row_clear': glow.setTint(0x00ff00); break;
+                case 'col_clear': glow.setTint(0x0088ff); break;
+            }
+        }
+
+        // Sync glow position with item
+        const sync = () => {
+            if (glow.active && item.active) {
+                glow.setPosition(item.x, item.y);
+                glow.setDepth(item.depth - 0.5);
+            } else {
+                this.events.off('update', sync);
+            }
+        };
+        this.events.on('update', sync);
+
+        return glow;
+    }
+
+    /** Draw a decorative rounded-rect frame around the grid */
+    private drawGridFrame() {
+        const frame = this.add.graphics();
+        const padding = 12;
+        const x = GRID_OFFSET_X - CELL_SIZE / 2 - padding;
+        const y = GRID_OFFSET_Y - CELL_SIZE / 2 - padding;
+        const w = GRID_COLS * CELL_SIZE + padding * 2;
+        const h = GRID_ROWS * CELL_SIZE + padding * 2;
+
+        frame.lineStyle(4, 0x4a2a5e, 0.3);
+        frame.strokeRoundedRect(x, y, w, h, 16);
+        frame.setDepth(0);
+    }
+
+    /** Add decorative semi-transparent circles to background for depth */
+    private drawDecorativeBackground() {
+        // Remove the boring dot pattern and add decorative shapes
+        // Remove existing pattern (we'll just add shapes on top)
+        const deco = this.add.graphics();
+        deco.setDepth(-1);
+
+        const colors = [0x4a2a5e, 0xff6b35, 0x8b5cf6, 0x6d28d9];
+        for (let i = 0; i < 15; i++) {
+            const cx = Phaser.Math.Between(0, 720);
+            const cy = Phaser.Math.Between(0, 1080);
+            const radius = Phaser.Math.Between(10, 50);
+            const color = colors[i % colors.length];
+            const alpha = Phaser.Math.FloatBetween(0.05, 0.1);
+
+            deco.fillStyle(color, alpha);
+            deco.fillCircle(cx, cy, radius);
+        }
+    }
+
+    /** Floating score bubble near the top bar */
+    private createScoreBubble(points: number) {
+        const bubbleX = this.scoreText.x + 80; // Near score display
+        const bubbleY = this.scoreText.y;
+
+        const bg = this.add.circle(bubbleX, bubbleY, 24, 0x000000, 0.6)
+            .setDepth(55)
+            .setScale(0);
+
+        const label = this.add.text(bubbleX, bubbleY, `+${points}`, {
+            fontSize: '18px',
+            fontFamily: 'Arial',
+            color: '#ffcc00',
+            fontStyle: 'bold',
+        }).setOrigin(0.5).setDepth(56).setScale(0);
+
+        // Animate in with bounce, float up, fade out
+        this.tweens.add({
+            targets: [bg, label],
+            scale: 1,
+            duration: 300,
+            ease: 'Back.easeOut',
+            onComplete: () => {
+                this.tweens.add({
+                    targets: [bg, label],
+                    y: bubbleY - 40,
+                    alpha: 0,
+                    duration: 600,
+                    delay: 300,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        bg.destroy();
+                        label.destroy();
+                    }
+                });
+            }
+        });
+    }
+
+    // ── END VFX METHODS ──────────────────────────────────────────
+
     private generateTextures() {
         // Generate shadow texture (rendered once, used as cheap Sprite)
         const shadowGfx = this.make.graphics({ x: 0, y: 0 });
@@ -1760,6 +2034,20 @@ export class GameScene extends Phaser.Scene {
         shadowGfx.fillEllipse(CELL_SIZE / 2, CELL_SIZE / 2 + 4, CELL_SIZE - 16, 18);
         shadowGfx.generateTexture('item_shadow', CELL_SIZE, CELL_SIZE);
         shadowGfx.destroy();
+
+        // Generate glow texture for selected/special items: soft radial glow 64x64
+        if (!this.textures.exists('food_glow')) {
+            const glowSize = 64;
+            const glowGfx = this.make.graphics({ x: 0, y: 0 });
+            // Radial-like soft glow: multiple concentric circles with decreasing alpha
+            for (let r = glowSize / 2; r >= 2; r -= 4) {
+                const alpha = 0.3 * (1 - r / (glowSize / 2));
+                glowGfx.fillStyle(0xffffff, alpha);
+                glowGfx.fillCircle(glowSize / 2, glowSize / 2, r);
+            }
+            glowGfx.generateTexture('food_glow', glowSize, glowSize);
+            glowGfx.destroy();
+        }
 
         const graphics = this.make.graphics({ x: 0, y: 0 });
 
