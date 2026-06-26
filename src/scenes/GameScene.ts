@@ -195,84 +195,60 @@ export class GameScene extends Phaser.Scene {
             color: '#ff6b35',
             fontStyle: 'bold'
         }).setOrigin(0.5);
-        this.tweens.add({ targets: title, y: 30, duration: 800, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: title, y: 23, duration: 800, ease: 'Back.easeOut' });
 
         // Level - under title
-        const levelText = this.add.text(360, 80, `Уровень ${config.level}: ${config.name}`, {
-            fontSize: '18px',
+        const levelText = this.add.text(360, 55, `Уровень ${config.level}: ${config.name}`, {
+            fontSize: '16px',
             fontFamily: 'Arial',
             color: '#ffcc00',
         }).setOrigin(0.5).setAlpha(0);
         this.tweens.add({ targets: levelText, alpha: 1, duration: 600, delay: 300 });
 
-        // Progress bar background with star markers
-        this.progressBar = this.add.graphics();
-        this.drawProgressBar();
-        
-        // Star markers on progress bar (Royal Match style)
-        const barX = 50, barY = 175, barW = 620;
-        const starPositions = [0.33, 0.66, 1.0]; // 1, 2, 3 stars
-        starPositions.forEach((pct, idx) => {
-            const starX = barX + barW * pct;
-            const star = this.add.text(starX, barY - 5, '☆', {
-                fontSize: '16px',
-                color: '#ffcc00'
-            }).setOrigin(0.5).setAlpha(0);
-            this.tweens.add({ targets: star, alpha: 1, duration: 600, delay: 500 + idx * 100 });
-        });
-
         // Score - top left
-        this.scoreText = this.add.text(-100, 10, 'Счёт: 0', {
-            fontSize: '24px',
+        this.scoreText = this.add.text(-100, 8, 'Счёт: 0', {
+            fontSize: '20px',
             fontFamily: 'Arial',
             color: '#ffffff'
         });
         this.tweens.add({ targets: this.scoreText, x: 20, duration: 600, ease: 'Power2', delay: 100 });
 
         // Moves - under score
-        this.movesText = this.add.text(-100, 40, `Ходы: ${INITIAL_MOVES}`, {
-            fontSize: '24px',
+        this.movesText = this.add.text(-100, 32, `Ходы: ${INITIAL_MOVES}`, {
+            fontSize: '18px',
             fontFamily: 'Arial',
             color: '#ffffff'
         });
         this.tweens.add({ targets: this.movesText, x: 20, duration: 600, ease: 'Power2', delay: 200 });
 
         // Target - top right
-        const targetText = this.add.text(820, 10, `Цель: ${config.targetScore}`, {
-            fontSize: '24px',
+        const targetText = this.add.text(800, 8, `Цель: ${config.targetScore}`, {
+            fontSize: '20px',
             fontFamily: 'Arial',
             color: '#ffcc00'
-        });
-        this.tweens.add({ targets: targetText, x: 580, duration: 600, ease: 'Power2', delay: 300 });
+        }).setOrigin(1, 0);
+        this.tweens.add({ targets: targetText, x: 700, duration: 600, ease: 'Power2', delay: 300 });
 
         // Best score - under target
-        const bestText = this.add.text(820, 40, `Рекорд: ${this.bestScore}`, {
-            fontSize: '24px',
+        const bestText = this.add.text(800, 32, `Рекорд: ${this.bestScore}`, {
+            fontSize: '18px',
             fontFamily: 'Arial',
             color: '#00ff88'
-        });
-        this.tweens.add({ targets: bestText, x: 580, duration: 600, ease: 'Power2', delay: 400 });
+        }).setOrigin(1, 0);
+        this.tweens.add({ targets: bestText, x: 700, duration: 600, ease: 'Power2', delay: 400 });
 
-        // Coins - top right (near best score)
+        // Coins - under best
         const coins = this.levelManager.getCoins();
-        this.coinsText = this.add.text(820, 70, `🪙 ${coins}`, {
-            fontSize: '24px',
+        this.coinsText = this.add.text(800, 56, `🪙 ${coins}`, {
+            fontSize: '18px',
             fontFamily: 'Arial',
             color: '#ffcc00'
-        }).setOrigin(0.5, 0).setAlpha(0);
-        this.tweens.add({ targets: this.coinsText, x: 580, duration: 600, ease: 'Power2', delay: 500 });
-
-        // Combo text (hidden initially)
-        this.comboText = this.add.text(360, 950, '', {
-            fontSize: '32px',
-            fontFamily: 'Arial',
-            color: '#ff00ff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5).setVisible(false);
+        }).setOrigin(1, 0).setAlpha(0);
+        this.tweens.add({ targets: this.coinsText, x: 700, duration: 600, ease: 'Power2', delay: 500 });
 
         // Sound toggle button - top right corner
         this.soundBtn = this.add.text(700, 30, '🔊', {
-            fontSize: '32px',
+            fontSize: '28px',
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         // Add pulse animation to sound button
@@ -295,7 +271,33 @@ export class GameScene extends Phaser.Scene {
         this.soundBtn.on('pointerover', () => this.soundBtn.setScale(1.2));
         this.soundBtn.on('pointerout', () => this.soundBtn.setScale(1));
 
-        // Boosters panel - bottom of screen (Royal Match style)
+        // Progress bar - centered below title/level
+        this.progressBar = this.add.graphics();
+        this.drawProgressBar();
+        
+        // Star markers on progress bar
+        const barX = 50, barY = 90, barW = 620;
+        const starPositions = [0.33, 0.66, 1.0];
+        starPositions.forEach((pct, idx) => {
+            const starX = barX + barW * pct;
+            const star = this.add.text(starX, barY - 5, '☆', {
+                fontSize: '16px',
+                color: '#ffcc00'
+            }).setOrigin(0.5).setAlpha(0).setDepth(2);
+            this.tweens.add({ targets: star, alpha: 1, duration: 600, delay: 500 + idx * 100 });
+        });
+
+        // Combo text - center screen, floating above grid (between UI and grid)
+        this.comboText = this.add.text(360, 200, '', {
+            fontSize: '36px',
+            fontFamily: 'Arial',
+            color: '#ff00ff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setVisible(false).setDepth(50);
+
+        // Boosters panel - bottom of screen
         this.createBoostersPanel();
 
         // Game over panel (hidden initially)
@@ -320,8 +322,8 @@ export class GameScene extends Phaser.Scene {
             color: '#ffcc00'
         }).setOrigin(0.5);
 
-        const restartBtn = this.add.text(0, 100, 'ЗАНОВО', {
-            fontSize: '32px',
+        const restartBtn = this.add.text(-100, 100, 'ЗАНОВО', {
+            fontSize: '28px',
             fontFamily: 'Arial',
             color: '#00ff88',
             fontStyle: 'bold',
@@ -341,6 +343,28 @@ export class GameScene extends Phaser.Scene {
             restartBtn.setScale(1);
         });
 
+        // Map button
+        const mapBtn = this.add.text(100, 100, 'КАРТА', {
+            fontSize: '28px',
+            fontFamily: 'Arial',
+            color: '#ffcc00',
+            fontStyle: 'bold',
+            backgroundColor: '#333333',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
+
+        mapBtn.on('pointerdown', () => {
+            this.scene.start('WorldMapScene');
+        });
+
+        mapBtn.on('pointerover', () => {
+            mapBtn.setScale(1.1);
+        });
+
+        mapBtn.on('pointerout', () => {
+            mapBtn.setScale(1);
+        });
+
         // Coin reward text (hidden initially)
         const coinText = this.add.text(0, 50, '', {
             fontSize: '24px',
@@ -348,7 +372,7 @@ export class GameScene extends Phaser.Scene {
             color: '#ffcc00'
         }).setOrigin(0.5).setVisible(false);
 
-        this.gameOverPanel.add([bg, title, scoreText, coinText, restartBtn]);
+        this.gameOverPanel.add([bg, title, scoreText, coinText, restartBtn, mapBtn]);
         this.gameOverPanel.setVisible(false);
         this.gameOverPanel.setData('scoreText', scoreText);
         this.gameOverPanel.setData('titleText', title);
@@ -362,6 +386,21 @@ export class GameScene extends Phaser.Scene {
 
         const boosterCost = 50; // Coins to buy one booster
 
+        // Background panel for boosters
+        const panelBg = this.add.graphics();
+        panelBg.fillStyle(0x222222, 0.85);
+        panelBg.fillRoundedRect(30, panelY - 22, 660, 55, 12);
+        panelBg.lineStyle(2, 0xffcc00, 0.3);
+        panelBg.strokeRoundedRect(30, panelY - 22, 660, 55, 12);
+        panelBg.setDepth(0);
+
+        // "Бустеры:" label
+        this.add.text(50, panelY, 'Бустеры:', {
+            fontSize: '14px',
+            fontFamily: 'Arial',
+            color: '#aaaaaa',
+        }).setOrigin(0, 0.5).setDepth(1);
+
         // Booster: Light Ball
         this.boosterLightBallText = this.add.text(startX, panelY, `⚡ ${this.boosterLightBall}`, {
             fontSize: '28px',
@@ -369,7 +408,7 @@ export class GameScene extends Phaser.Scene {
             color: '#ffffff',
             backgroundColor: '#333333',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(1);
 
         this.boosterLightBallText.on('pointerdown', () => {
             if (this.boosterLightBall > 0) {
@@ -388,7 +427,7 @@ export class GameScene extends Phaser.Scene {
             color: '#ffffff',
             backgroundColor: '#333333',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(1);
 
         this.boosterBombText.on('pointerdown', () => {
             if (this.boosterBomb > 0) {
@@ -407,7 +446,7 @@ export class GameScene extends Phaser.Scene {
             color: '#ffffff',
             backgroundColor: '#333333',
             padding: { x: 10, y: 5 }
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(1);
 
         this.boosterDiscoText.on('pointerdown', () => {
             if (this.boosterDisco > 0) {
@@ -457,8 +496,8 @@ export class GameScene extends Phaser.Scene {
         
         if (type === 'bomb') {
             // Destroy 3x3 area
-            for (let r = Math.max(0, row - 1); r <= Math.min(8, row + 1); r++) {
-                for (let c = Math.max(0, col - 1); c <= Math.min(6, col + 1); c++) {
+            for (let r = Math.max(0, row - 1); r <= Math.min(GRID_ROWS - 1, row + 1); r++) {
+                for (let c = Math.max(0, col - 1); c <= Math.min(GRID_COLS - 1, col + 1); c++) {
                     const target = this.grid[r][c];
                     if (target) this.destroyItem(target);
                 }
@@ -466,8 +505,8 @@ export class GameScene extends Phaser.Scene {
         } else if (type === 'lightball') {
             // Destroy all of same type
             const targetType = item.foodType;
-            for (let r = 0; r < 9; r++) {
-                for (let c = 0; c < 7; c++) {
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
                     const target = this.grid[r][c];
                     if (target && target.foodType === targetType) this.destroyItem(target);
                 }
@@ -476,8 +515,8 @@ export class GameScene extends Phaser.Scene {
             // Change all of one type to another
             const targetType = item.foodType;
             const newType = FOOD_TYPES[(FOOD_TYPES.indexOf(targetType) + 1) % FOOD_COUNT];
-            for (let r = 0; r < 9; r++) {
-                for (let c = 0; c < 7; c++) {
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
                     const target = this.grid[r][c];
                     if (target && target.foodType === targetType) {
                         target.setTexture(newType);
@@ -1179,7 +1218,7 @@ export class GameScene extends Phaser.Scene {
         this.lastProgressPct = progressPct;
 
         const barX = 70;
-        const barY = 170;
+        const barY = 88;
         const barW = 580;
         const barH = 12;
 

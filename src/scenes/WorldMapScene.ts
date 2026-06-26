@@ -33,16 +33,16 @@ export class WorldMapScene extends Phaser.Scene {
         bg.fillRect(0, 0, 720, 1080);
 
         // Title
-        this.add.text(360, 80, 'КАРТА МИРА', {
-            fontSize: '48px',
+        this.add.text(360, 60, 'КАРТА МИРА', {
+            fontSize: '42px',
             fontFamily: 'Arial',
             color: '#ff6b35',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
         // Subtitle
-        this.add.text(360, 140, 'SAMSA SWAP', {
-            fontSize: '24px',
+        this.add.text(360, 110, 'SAMSA SWAP', {
+            fontSize: '20px',
             fontFamily: 'Arial',
             color: '#ffcc00'
         }).setOrigin(0.5);
@@ -54,8 +54,8 @@ export class WorldMapScene extends Phaser.Scene {
         this.animateCurrentLevel();
 
         // Back button
-        const backBtn = this.add.text(360, 1000, 'ВЕРНУТЬСЯ', {
-            fontSize: '28px',
+        const backBtn = this.add.text(360, 1020, 'ВЕРНУТЬСЯ', {
+            fontSize: '24px',
             fontFamily: 'Arial',
             color: '#ffffff',
             backgroundColor: '#333333',
@@ -72,12 +72,29 @@ export class WorldMapScene extends Phaser.Scene {
 
     private createLevelNodes() {
         const totalLevels = this.levelManager.getTotalLevels();
-        const startY = 250;
-        const nodeSpacing = 100;
+        const startY = 220;
+        const nodeSpacing = 75;
 
+        // First pass: calculate all node positions
+        const nodePositions: { x: number; y: number }[] = [];
         for (let i = 1; i <= totalLevels; i++) {
             const x = 360 + Math.sin(i * 0.8) * 200;
             const y = startY + (i - 1) * nodeSpacing;
+            nodePositions.push({ x, y });
+        }
+
+        // Draw all path lines BEFORE circles (so lines go behind)
+        for (let i = 1; i < totalLevels; i++) {
+            const prev = nodePositions[i - 1];
+            const curr = nodePositions[i];
+            const path = this.add.graphics();
+            path.lineStyle(6, 0x666666, 0.8);
+            path.lineBetween(prev.x, prev.y, curr.x, curr.y);
+        }
+
+        // Second pass: create all level nodes (circles drawn AFTER lines)
+        for (let i = 1; i <= totalLevels; i++) {
+            const { x, y } = nodePositions[i - 1];
 
             const isUnlocked = i <= this.levelManager.getMaxUnlockedLevel();
             const stars = this.levelManager.getStars(i);
@@ -85,25 +102,25 @@ export class WorldMapScene extends Phaser.Scene {
 
             // Node circle
             const color = isUnlocked ? 0xff6b35 : 0x666666;
-            const circle = this.add.circle(x, y, 35, color, 1)
+            const circle = this.add.circle(x, y, 30, color, 1)
                 .setStrokeStyle(4, 0xffcc00);
 
             // Level number
             const levelText = this.add.text(x, y, i.toString(), {
-                fontSize: '24px',
+                fontSize: '22px',
                 fontFamily: 'Arial',
                 color: '#ffffff',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
 
             // Stars
-            const starText = this.add.text(x, y + 50, this.getStarString(stars), {
-                fontSize: '20px'
+            const starText = this.add.text(x, y + 42, this.getStarString(stars), {
+                fontSize: '16px'
             }).setOrigin(0.5);
 
             // Level name
-            const nameText = this.add.text(x, y + 75, config.name, {
-                fontSize: '14px',
+            const nameText = this.add.text(x, y + 65, config.name, {
+                fontSize: '12px',
                 fontFamily: 'Arial',
                 color: isUnlocked ? '#ffffff' : '#666666'
             }).setOrigin(0.5);
@@ -138,14 +155,6 @@ export class WorldMapScene extends Phaser.Scene {
                         circle.setScale(1);
                     }
                 });
-            }
-
-            // Draw path line from previous node
-            if (i > 1) {
-                const prevNode = this.levelNodes[i - 2];
-                const path = this.add.graphics();
-                path.lineStyle(6, 0x666666, 0.8);
-                path.lineBetween(prevNode.circle.x, prevNode.circle.y, x, y);
             }
         }
     }

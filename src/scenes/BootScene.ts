@@ -37,7 +37,7 @@ export class BootScene extends Phaser.Scene {
             fontStyle: 'bold',
             stroke: '#000000',
             strokeThickness: 6,
-        }).setOrigin(0.5).setAlpha(0);
+        }).setOrigin(0.5).setAlpha(0).setDepth(1);
 
         const subtitle = this.add.text(w / 2, h * 0.32, 'SWAP', {
             fontSize: '52px',
@@ -46,7 +46,7 @@ export class BootScene extends Phaser.Scene {
             fontStyle: 'bold',
             stroke: '#000000',
             strokeThickness: 4,
-        }).setOrigin(0.5).setAlpha(0);
+        }).setOrigin(0.5).setAlpha(0).setDepth(1);
 
         // Tagline
         this.add.text(w / 2, h * 0.40, 'Match-3 с восточной кухней', {
@@ -67,7 +67,7 @@ export class BootScene extends Phaser.Scene {
         }
 
         // Play button
-        const btnBg = this.add.graphics();
+        const btnBg = this.add.graphics().setDepth(1);
         const btnW = 240;
         const btnH = 70;
         const btnX = w / 2 - btnW / 2;
@@ -83,7 +83,7 @@ export class BootScene extends Phaser.Scene {
             fontFamily: 'Arial',
             color: '#ffffff',
             fontStyle: 'bold',
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(1);
 
         // Make button interactive
         const btnZone = this.add.zone(w / 2, btnY + btnH / 2, btnW, btnH).setInteractive({ useHandCursor: true });
@@ -165,6 +165,7 @@ export class BootScene extends Phaser.Scene {
             const scale = Phaser.Math.FloatBetween(0.3, 0.5);
             item.setScale(scale);
             item.setAlpha(0.15 + Math.random() * 0.1);
+            item.setDepth(0);
 
             // Gentle floating
             this.tweens.add({
