@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { FOOD_TYPES } from '../utils/constants';
+import { soundManager } from '../utils/SoundManager';
 
 export class BootScene extends Phaser.Scene {
     private floatingItems: Phaser.GameObjects.Sprite[] = [];
@@ -89,6 +90,7 @@ export class BootScene extends Phaser.Scene {
         const btnZone = this.add.zone(w / 2, btnY + btnH / 2, btnW, btnH).setInteractive({ useHandCursor: true });
 
         btnZone.on('pointerover', () => {
+            soundManager.playClick();
             btnBg.clear();
             btnBg.fillStyle(0xff8855, 1);
             btnBg.fillRoundedRect(btnX - 4, btnY - 4, btnW + 8, btnH + 8, 22);
@@ -114,7 +116,7 @@ export class BootScene extends Phaser.Scene {
         });
 
         // Animations
-        // Title slide-in
+        // Title slide-in with sound
         this.tweens.add({
             targets: title,
             alpha: 1,
@@ -122,6 +124,9 @@ export class BootScene extends Phaser.Scene {
             duration: 800,
             ease: 'Back.easeOut',
             delay: 200,
+            onStart: () => {
+                soundManager.playMatch(3);
+            }
         });
 
         this.tweens.add({
@@ -167,7 +172,7 @@ export class BootScene extends Phaser.Scene {
             item.setAlpha(0.15 + Math.random() * 0.1);
             item.setDepth(0);
 
-            // Gentle floating
+            // Gentle floating with slight angle oscillation
             this.tweens.add({
                 targets: item,
                 y: y + Phaser.Math.Between(-30, 30),

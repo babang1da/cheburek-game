@@ -10,6 +10,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
     public isTweening: boolean = false;
     public specialType: 'none' | 'bomb' | 'rainbow' | 'row_clear' | 'col_clear' = 'none';
     public shadow: Phaser.GameObjects.Sprite | null = null;
+    private specialOutline: Phaser.GameObjects.Rectangle | null = null;
 
     constructor(
         scene: Phaser.Scene,
@@ -106,6 +107,7 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
 
     animateDestroy(): Promise<void> {
         return new Promise((resolve) => {
+            this.clearSpecialVisual();
             this.scene.tweens.add({
                 targets: this,
                 scaleX: 0,
@@ -139,5 +141,117 @@ export class FoodItem extends Phaser.GameObjects.Sprite {
             duration: 100,
             ease: 'Power2'
         });
+    }
+
+    /**
+     * Set visual effects for special tile types (bomb, rainbow, row_clear, col_clear)
+     */
+    setSpecialVisual() {
+        // Remove any existing glow assets first
+        this.clearSpecialVisual();
+
+        // Add a pulsing outline rectangle behind the item
+        this.specialOutline = this.scene.add.rectangle(this.x, this.y, 80, 80, 0xffffff, 0)
+            .setStrokeStyle(3, 0xffffff, 0.8)
+            .setDepth(this.depth - 1);
+
+        switch (this.specialType) {
+            case 'bomb':
+                // Pulsing red glow + tint
+                this.setTint(0xff4444);
+                this.specialOutline.setStrokeStyle(3, 0xff0000, 0.9);
+                this.scene.tweens.add({
+                    targets: this,
+                    alpha: 0.6,
+                    duration: 300,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+                // Also pulse the outline
+                this.scene.tweens.add({
+                    targets: this.specialOutline,
+                    alpha: 0.4,
+                    duration: 400,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+                break;
+
+            case 'rainbow':
+                // Cycle through rainbow tints
+                this.specialOutline.setStrokeStyle(3, 0xff00ff, 0.9);
+                const rainbowColors = [0xff0000, 0xff8800, 0xffff00, 0x00ff00, 0x0088ff, 0x8800ff];
+                let colorIdx = 0;
+                this.scene.time.addEvent({
+                    delay: 300,
+                    loop: true,
+                    callback: () => {
+                        if (!this.active) {
+                            return;
+                        }
+                        this.setTint(rainbowColors[colorIdx % rainbowColors.length]);
+                        this.specialOutline?.setStrokeStyle(3, rainbowColors[colorIdx % rainbowColors.length], 0.9);
+                        colorIdx++;
+                    }
+                });
+                break;
+
+            case 'row_clear':
+                // Green tint — horizontal arrows effect
+                this.setTint(0x44ff44);
+                this.specialOutline.setStrokeStyle(3, 0x00ff00, 0.9);
+                // Pulse outline horizontally
+                this.scene.tweens.add({
+                    targets: this.specialOutline,
+                    scaleX: 1.1,
+                    alpha: 0.5,
+                    duration: 350,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+                break;
+
+            case 'col_clear':
+                // Blue tint — vertical arrows effect
+                this.setTint(0x4488ff);
+                this.specialOutline.setStrokeStyle(3, 0x0088ff, 0.9);
+                // Pulse outline vertically
+                this.scene.tweens.add({
+                    targets: this.specialOutline,
+                    scaleY: 1.1,
+                    alpha: 0.5,
+                    duration: 350,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+                break;
+        }
+
+        // Sync outline position with item
+        this.scene.events.on('update', this.syncSpecialGlow, this);
+    }
+
+    private syncSpecialGlow() {
+        if (this.specialOutline) {
+            this.specialOutline.setPosition(this.x, this.y);
+            this.specialOutline.setDepth(this.depth - 1);
+        }
+    }
+
+    /** Remove all special visual effects and reset tint/alpha */
+    clearSpecialVisual() {
+        this.scene.tweens.killTweensOf(this);
+        this.clearTint();
+        this.setAlpha(1);
+        if (this.specialOutline) {
+            this.scene.tweens.killTweensOf(this.specialOutline);
+            this.specialOutline.destroy();
+            this.specialOutline = null;
+        }
+        this.scene.events.off('update', this.syncSpecialGlow, this);
     }
 }

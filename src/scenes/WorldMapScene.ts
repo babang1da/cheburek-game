@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { LevelManager } from '../utils/LevelManager';
 import { LEVELS } from '../utils/LevelManager';
+import { soundManager } from '../utils/SoundManager';
 
 interface LevelNode {
     circle: Phaser.GameObjects.Arc;
@@ -105,9 +106,15 @@ export class WorldMapScene extends Phaser.Scene {
             const circle = this.add.circle(x, y, 30, color, 1)
                 .setStrokeStyle(4, 0xffcc00);
 
-            // Level number
-            const levelText = this.add.text(x, y, i.toString(), {
-                fontSize: '22px',
+            // Level number or lock
+            let levelDisplayText: string;
+            if (isUnlocked) {
+                levelDisplayText = i.toString();
+            } else {
+                levelDisplayText = '🔒';
+            }
+            const levelText = this.add.text(x, y, levelDisplayText, {
+                fontSize: isUnlocked ? '22px' : '18px',
                 fontFamily: 'Arial',
                 color: '#ffffff',
                 fontStyle: 'bold'
@@ -117,6 +124,16 @@ export class WorldMapScene extends Phaser.Scene {
             const starText = this.add.text(x, y + 42, this.getStarString(stars), {
                 fontSize: '16px'
             }).setOrigin(0.5);
+
+            // Checkmark for completed levels
+            if (stars > 0) {
+                this.add.text(x + 35, y - 35, '✓', {
+                    fontSize: '20px',
+                    fontFamily: 'Arial',
+                    color: '#00ff88',
+                    fontStyle: 'bold'
+                }).setOrigin(0.5);
+            }
 
             // Level name
             const nameText = this.add.text(x, y + 65, config.name, {
@@ -141,7 +158,10 @@ export class WorldMapScene extends Phaser.Scene {
                 circle.setInteractive({ useHandCursor: true });
                 levelText.setInteractive({ useHandCursor: true });
 
-                const clickHandler = () => this.selectLevel(node);
+                const clickHandler = () => {
+                    soundManager.playClick();
+                    this.selectLevel(node);
+                };
                 circle.on('pointerdown', clickHandler);
                 levelText.on('pointerdown', clickHandler);
 
@@ -195,6 +215,33 @@ export class WorldMapScene extends Phaser.Scene {
                 yoyo: true,
                 repeat: -1,
                 ease: 'Sine.easeInOut'
+            });
+
+            // Arrow indicator above current level
+            const arrow = this.add.text(currentNode.circle.x, currentNode.circle.y - 55, '👇', {
+                fontSize: '28px'
+            }).setOrigin(0.5).setDepth(10);
+
+            this.tweens.add({
+                targets: arrow,
+                y: arrow.y + 5,
+                duration: 500,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
+
+        // Scroll to center the current level if many levels
+        const totalLevels = this.levelManager.getTotalLevels();
+        if (totalLevels > 8 && currentNode) {
+            const targetY = currentNode.circle.y - 300;
+            this.cameras.main.scrollY = 0;
+            this.tweens.add({
+                targets: this.cameras.main,
+                scrollY: Math.max(0, targetY),
+                duration: 600,
+                ease: 'Power2'
             });
         }
     }

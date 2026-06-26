@@ -35,7 +35,7 @@ export class GameScene extends Phaser.Scene {
 
     private soundBtn!: Phaser.GameObjects.Text;
     private hintTimer: Phaser.Time.TimerEvent | null = null;
-    private hintItems: FoodItem[] = [];
+    private hintItems: (FoodItem | Phaser.GameObjects.Text)[] = [];
     private fpsText!: Phaser.GameObjects.Text;
 
     private levelManager: LevelManager = new LevelManager();
@@ -275,7 +275,7 @@ export class GameScene extends Phaser.Scene {
         this.progressBar = this.add.graphics();
         this.drawProgressBar();
         
-        // Star markers on progress bar
+        // Star markers on progress bar — store references for animation
         const barX = 50, barY = 90, barW = 620;
         const starPositions = [0.33, 0.66, 1.0];
         starPositions.forEach((pct, idx) => {
@@ -283,7 +283,7 @@ export class GameScene extends Phaser.Scene {
             const star = this.add.text(starX, barY - 5, '☆', {
                 fontSize: '16px',
                 color: '#ffcc00'
-            }).setOrigin(0.5).setAlpha(0).setDepth(2);
+            }).setOrigin(0.5).setAlpha(0).setDepth(2).setData('starIdx', idx).setData('activated', false);
             this.tweens.add({ targets: star, alpha: 1, duration: 600, delay: 500 + idx * 100 });
         });
 
@@ -308,60 +308,99 @@ export class GameScene extends Phaser.Scene {
         this.gameOverPanel = this.add.container(360, 540);
         this.gameOverPanel.setDepth(100); // Ensure it's above everything
 
-        const bg = this.add.rectangle(0, 0, 600, 400, 0x000000, 0.9).setStrokeStyle(4, 0xffcc00);
-        const title = this.add.text(0, -100, 'ИГРА ОКОНЧЕНА', {
+        const bg = this.add.rectangle(0, 0, 600, 400, 0x000000, 0.85).setStrokeStyle(4, 0xffcc00);
+        const title = this.add.text(0, -130, 'ИГРА ОКОНЧЕНА', {
             fontSize: '42px',
             fontFamily: 'Arial',
             color: '#ffffff',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
         }).setOrigin(0.5);
 
-        const scoreText = this.add.text(0, 0, '', {
+        const scoreText = this.add.text(0, -20, '', {
             fontSize: '28px',
             fontFamily: 'Arial',
             color: '#ffcc00'
         }).setOrigin(0.5);
 
-        const restartBtn = this.add.text(-100, 100, 'ЗАНОВО', {
-            fontSize: '28px',
+        // Graphical restart button (rounded rect)
+        const restartBg = this.add.graphics();
+        const restartBgW = 170;
+        const restartBgH = 54;
+        const restartBgX = -120;
+        const restartBgY = 100;
+        restartBg.fillStyle(0x00aa55, 1);
+        restartBg.fillRoundedRect(restartBgX, restartBgY, restartBgW, restartBgH, 16);
+        restartBg.lineStyle(2, 0x00ff88, 1);
+        restartBg.strokeRoundedRect(restartBgX, restartBgY, restartBgW, restartBgH, 16);
+
+        const restartBtn = this.add.text(restartBgX + restartBgW / 2, restartBgY + restartBgH / 2, '↺ ЗАНОВО', {
+            fontSize: '24px',
             fontFamily: 'Arial',
-            color: '#00ff88',
+            color: '#ffffff',
             fontStyle: 'bold',
-            backgroundColor: '#333333',
-            padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setInteractive();
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         restartBtn.on('pointerdown', () => {
             this.scene.restart();
         });
 
         restartBtn.on('pointerover', () => {
-            restartBtn.setScale(1.1);
+            restartBg.clear();
+            restartBg.fillStyle(0x00cc66, 1);
+            restartBg.fillRoundedRect(restartBgX - 4, restartBgY - 4, restartBgW + 8, restartBgH + 8, 18);
+            restartBg.lineStyle(3, 0x00ff88, 1);
+            restartBg.strokeRoundedRect(restartBgX - 4, restartBgY - 4, restartBgW + 8, restartBgH + 8, 18);
+            restartBtn.setScale(1.05);
         });
 
         restartBtn.on('pointerout', () => {
+            restartBg.clear();
+            restartBg.fillStyle(0x00aa55, 1);
+            restartBg.fillRoundedRect(restartBgX, restartBgY, restartBgW, restartBgH, 16);
+            restartBg.lineStyle(2, 0x00ff88, 1);
+            restartBg.strokeRoundedRect(restartBgX, restartBgY, restartBgW, restartBgH, 16);
             restartBtn.setScale(1);
         });
 
-        // Map button
-        const mapBtn = this.add.text(100, 100, 'КАРТА', {
-            fontSize: '28px',
+        // Graphical map button
+        const mapBg2 = this.add.graphics();
+        const mapBg2W = 170;
+        const mapBg2H = 54;
+        const mapBg2X = 120 - mapBg2W / 2;
+        const mapBg2Y = 100;
+        mapBg2.fillStyle(0x555555, 1);
+        mapBg2.fillRoundedRect(mapBg2X, mapBg2Y, mapBg2W, mapBg2H, 16);
+        mapBg2.lineStyle(2, 0xffcc00, 1);
+        mapBg2.strokeRoundedRect(mapBg2X, mapBg2Y, mapBg2W, mapBg2H, 16);
+
+        const mapBtn = this.add.text(mapBg2X + mapBg2W / 2, mapBg2Y + mapBg2H / 2, '🗺 КАРТА', {
+            fontSize: '24px',
             fontFamily: 'Arial',
-            color: '#ffcc00',
+            color: '#ffffff',
             fontStyle: 'bold',
-            backgroundColor: '#333333',
-            padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setInteractive();
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         mapBtn.on('pointerdown', () => {
             this.scene.start('WorldMapScene');
         });
 
         mapBtn.on('pointerover', () => {
-            mapBtn.setScale(1.1);
+            mapBg2.clear();
+            mapBg2.fillStyle(0x777777, 1);
+            mapBg2.fillRoundedRect(mapBg2X - 4, mapBg2Y - 4, mapBg2W + 8, mapBg2H + 8, 18);
+            mapBg2.lineStyle(3, 0xffcc00, 1);
+            mapBg2.strokeRoundedRect(mapBg2X - 4, mapBg2Y - 4, mapBg2W + 8, mapBg2H + 8, 18);
+            mapBtn.setScale(1.05);
         });
 
         mapBtn.on('pointerout', () => {
+            mapBg2.clear();
+            mapBg2.fillStyle(0x555555, 1);
+            mapBg2.fillRoundedRect(mapBg2X, mapBg2Y, mapBg2W, mapBg2H, 16);
+            mapBg2.lineStyle(2, 0xffcc00, 1);
+            mapBg2.strokeRoundedRect(mapBg2X, mapBg2Y, mapBg2W, mapBg2H, 16);
             mapBtn.setScale(1);
         });
 
@@ -372,7 +411,7 @@ export class GameScene extends Phaser.Scene {
             color: '#ffcc00'
         }).setOrigin(0.5).setVisible(false);
 
-        this.gameOverPanel.add([bg, title, scoreText, coinText, restartBtn, mapBtn]);
+        this.gameOverPanel.add([bg, title, scoreText, coinText, restartBg, restartBtn, mapBg2, mapBtn]);
         this.gameOverPanel.setVisible(false);
         this.gameOverPanel.setData('scoreText', scoreText);
         this.gameOverPanel.setData('titleText', title);
@@ -673,6 +712,7 @@ export class GameScene extends Phaser.Scene {
                 this.selectedItem = item;
                 item.isMoving = true; // Prevent idle animation during drag
                 item.setDepth(10); // Bring to front while dragging
+                this.highlightSelected(item);
                 this.clearHint();
                 this.resetHintTimer();
             }
@@ -691,6 +731,7 @@ export class GameScene extends Phaser.Scene {
             const startY = GRID_OFFSET_Y + item.gridRow * CELL_SIZE;
 
             if (!this.selectedItem || this.isProcessing) {
+                this.clearHighlight(item);
                 item.x = startX;
                 item.y = startY;
                 item.isMoving = false;
@@ -731,6 +772,7 @@ export class GameScene extends Phaser.Scene {
             }
 
             // Reset position if no valid swap
+            this.clearHighlight(item);
             item.isMoving = false;
             item.setDepth(1);
             this.selectedItem = null;
@@ -954,6 +996,7 @@ export class GameScene extends Phaser.Scene {
             const item = this.grid[spawn.row][spawn.col];
             if (item) {
                 item.specialType = spawn.type;
+                item.setSpecialVisual();
             }
         }
 
@@ -1199,14 +1242,46 @@ export class GameScene extends Phaser.Scene {
     }
 
     private updateUI() {
+        // Animate score with scale pop
         this.scoreText.setText(`Счёт: ${this.score}`);
+        this.tweens.killTweensOf(this.scoreText);
+        this.scoreText.setScale(1.1);
+        this.tweens.add({
+            targets: this.scoreText,
+            scale: 1,
+            duration: 150,
+            ease: 'Sine.easeOut'
+        });
+
+        // Flash moves red when decreasing
         this.movesText.setText(`Ходы: ${this.movesRemaining}`);
+        this.tweens.killTweensOf(this.movesText);
+        this.movesText.setTint(0xff0000);
+        this.tweens.add({
+            targets: this.movesText,
+            duration: 200,
+            onComplete: () => {
+                if (this.movesText && this.movesText.active) {
+                    this.movesText.clearTint();
+                }
+            }
+        });
+
         this.drawProgressBar();
     }
 
     private updateCoinsDisplay() {
         const coins = this.levelManager.getCoins();
         this.coinsText.setText(`🪙 ${coins}`);
+        // Animate coins with scale pop
+        this.tweens.killTweensOf(this.coinsText);
+        this.coinsText.setScale(1.2);
+        this.tweens.add({
+            targets: this.coinsText,
+            scale: 1,
+            duration: 200,
+            ease: 'Sine.easeOut'
+        });
     }
 
     private drawProgressBar() {
@@ -1217,24 +1292,71 @@ export class GameScene extends Phaser.Scene {
         if (progressPct === this.lastProgressPct) return;
         this.lastProgressPct = progressPct;
 
-        const barX = 70;
+        const barX = 50;
         const barY = 88;
-        const barW = 580;
-        const barH = 12;
+        const barW = 620;
+        const barH = 14;
 
         this.progressBar.clear();
-        // Background
-        this.progressBar.fillStyle(0x333333, 0.8);
-        this.progressBar.fillRoundedRect(barX, barY, barW, barH, 6);
-        // Progress
-        if (progress > 0) {
-            const color = progress >= 1 ? 0x00ff88 : 0xff6b35;
-            this.progressBar.fillStyle(color, 1);
-            this.progressBar.fillRoundedRect(barX, barY, barW * progress, barH, 6);
-        }
+        
+        // Dark semi-transparent background
+        this.progressBar.fillStyle(0x000000, 0.5);
+        this.progressBar.fillRoundedRect(barX, barY, barW, barH, 7);
+        
         // Border
-        this.progressBar.lineStyle(2, 0xffffff, 0.3);
-        this.progressBar.strokeRoundedRect(barX, barY, barW, barH, 6);
+        this.progressBar.lineStyle(1, 0xffffff, 0.2);
+        this.progressBar.strokeRoundedRect(barX, barY, barW, barH, 7);
+
+        // Progress fill with gradient (yellow→green)
+        if (progress > 0) {
+            const fillW = barW * progress;
+            // Only use gradient if wide enough (>= 20px)
+            if (fillW >= 20) {
+                const colorLeft = progress >= 0.66 ? 0x44ff44 : (progress >= 0.33 ? 0xaadd00 : 0xffcc00);
+                const colorRight = 0x44ff44;
+                this.progressBar.fillGradientStyle(colorLeft, colorRight, colorLeft, colorRight, 1);
+            } else {
+                this.progressBar.fillStyle(0xffcc00, 1);
+            }
+            this.progressBar.fillRoundedRect(barX, barY, fillW, barH, 7);
+            
+            // Glow effect when at 100%
+            if (progress >= 1) {
+                this.progressBar.fillStyle(0x00ff88, 0.3);
+                this.progressBar.fillRoundedRect(barX - 3, barY - 3, barW + 6, barH + 6, 10);
+            }
+        }
+
+        // Update star markers — activate stars when milestones reached
+        const threshholds = [0.33, 0.66, 1.0];
+        this.children.list.forEach(child => {
+            if (child instanceof Phaser.GameObjects.Text && child.getData('starIdx') !== undefined) {
+                const idx = child.getData('starIdx') as number;
+                const threshold = threshholds[idx];
+                const activated = child.getData('activated') as boolean;
+                if (progress >= threshold && !activated) {
+                    child.setData('activated', true);
+                    child.setText('⭐');
+                    // Animate star — scale 0 → 1.2 → 1
+                    child.setScale(0);
+                    this.tweens.killTweensOf(child);
+                    this.tweens.add({
+                        targets: child,
+                        scale: 1.2,
+                        duration: 200,
+                        ease: 'Back.easeOut',
+                        onComplete: () => {
+                            this.tweens.add({
+                                targets: child,
+                                scale: 1,
+                                duration: 100,
+                                ease: 'Sine.easeOut'
+                            });
+                        }
+                    });
+                }
+            }
+        });
     }
 
     private showCombo() {
@@ -1249,10 +1371,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     private showScorePopup(x: number, y: number, points: number) {
+        const isCombo = this.comboLevel >= 2;
         const text = this.add.text(x, y - 20, `+${points}`, {
-            fontSize: '22px',
+            fontSize: isCombo ? '28px' : '22px',
             fontFamily: 'Arial',
-            color: '#ffcc00',
+            color: isCombo ? '#ff00ff' : '#ffcc00',
             fontStyle: 'bold',
             stroke: '#000000',
             strokeThickness: 3,
@@ -1262,10 +1385,40 @@ export class GameScene extends Phaser.Scene {
             targets: text,
             y: y - 70,
             alpha: 0,
-            duration: 800,
+            duration: 600,
             ease: 'Power2',
             onComplete: () => text.destroy()
         });
+    }
+
+    // Highlight methods for selected item
+    private highlightSelected(item: FoodItem) {
+        this.tweens.killTweensOf(item);
+        item.setTint(0xffff00);
+        this.tweens.add({
+            targets: item,
+            scaleX: item.scaleX * 1.12,
+            scaleY: item.scaleY * 1.12,
+            duration: 150,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+    }
+
+    private clearHighlight(item: FoodItem) {
+        this.tweens.killTweensOf(item);
+        if (item.specialType === 'none') {
+            item.clearTint();
+        } else {
+            // Re-apply special visual since clearTint was called during killTweensOf
+            item.specialType = item.specialType; // no-op setter
+            item.setSpecialVisual();
+        }
+        // Reset scale back to normal
+        const maxSize = CELL_SIZE - 10;
+        const normalScale = Math.min(maxSize / item.width, maxSize / item.height);
+        item.setScale(normalScale);
     }
 
     private emitParticles(x: number, y: number, foodType: string) {
@@ -1338,7 +1491,22 @@ export class GameScene extends Phaser.Scene {
     private clearHint() {
         this.hintItems.forEach(item => {
             if (item && item.scene) {
-                item.clearTint();
+                this.tweens.killTweensOf(item);
+                if (item instanceof FoodItem) {
+                    item.isTweening = false;
+                    if (item.specialType === 'none') {
+                        item.clearTint();
+                    } else {
+                        item.setSpecialVisual();
+                    }
+                    // Reset scale
+                    const maxSize = CELL_SIZE - 10;
+                    const normalScale = Math.min(maxSize / item.width, maxSize / item.height);
+                    item.setScale(normalScale);
+                } else if (item instanceof Phaser.GameObjects.Text) {
+                    // Arrow text — destroy it
+                    item.destroy();
+                }
             }
         });
         this.hintItems = [];
@@ -1380,13 +1548,62 @@ export class GameScene extends Phaser.Scene {
         const item1 = this.grid[r1][c1];
         const item2 = this.grid[r2][c2];
         if (item1) {
-            item1.setTint(0xffff88);
+            this.tweens.killTweensOf(item1);
+            item1.isTweening = false;
+            this.tweens.add({
+                targets: item1,
+                scaleX: item1.scaleX * 1.15,
+                scaleY: item1.scaleY * 1.15,
+                duration: 300,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
             this.hintItems.push(item1);
         }
         if (item2) {
-            item2.setTint(0xffff88);
+            this.tweens.killTweensOf(item2);
+            item2.isTweening = false;
+            this.tweens.add({
+                targets: item2,
+                scaleX: item2.scaleX * 1.15,
+                scaleY: item2.scaleY * 1.15,
+                duration: 300,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
             this.hintItems.push(item2);
         }
+
+        // Add arrow between the two items
+        if (item1 && item2) {
+            const midX = (item1.x + item2.x) / 2;
+            const midY = (item1.y + item2.y) / 2;
+            const arrow = this.add.text(midX, midY - 40, '↔', {
+                fontSize: '28px',
+                fontFamily: 'Arial',
+                color: '#ffff00',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 4
+            }).setOrigin(0.5).setDepth(55).setAlpha(0);
+
+            this.tweens.add({
+                targets: arrow,
+                alpha: 1,
+                y: midY - 50,
+                duration: 400,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+
+            this.hintItems.push(arrow as any);
+        }
+
+        // Play hint sound
+        soundManager.playClick();
     }
 
     private checkGameState() {
@@ -1450,18 +1667,24 @@ export class GameScene extends Phaser.Scene {
         const titleText = this.gameOverPanel.getData('titleText') as Phaser.GameObjects.Text;
         const scoreText = this.gameOverPanel.getData('scoreText') as Phaser.GameObjects.Text;
 
-        titleText.setText(title);
-        titleText.setColor(isWin ? '#00ff88' : '#ff6b35');
+        if (isWin) {
+            titleText.setText(`🎉 ${title} 🎉`);
+            titleText.setColor('#00ff88');
+        } else {
+            titleText.setText(`💔 ${title}`);
+            titleText.setColor('#ff4444');
+        }
         scoreText.setText(`Финальный счёт: ${this.score}`);
 
-        // Royal Match style: animate panel in
-        this.gameOverPanel.setAlpha(0);
+        // Royal Match style: animate panel in with scale bounce
+        this.gameOverPanel.setAlpha(1);
         this.gameOverPanel.setVisible(true);
+        this.gameOverPanel.setScale(0.5);
         this.tweens.add({
             targets: this.gameOverPanel,
-            alpha: 1,
+            scale: 1,
             duration: 500,
-            ease: 'Power2'
+            ease: 'Back.easeOut'
         });
 
         // Show stars for win
